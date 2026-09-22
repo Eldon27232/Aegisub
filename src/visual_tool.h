@@ -187,6 +187,8 @@ private:
 	/// @brief Called when a hold is begun
 	/// @return Should the hold actually happen?
 	virtual bool InitializeHold() { return false; }
+	/// Called when the video canvas is clicked outside all visual features.
+	virtual void OnEmptyClick() { }
 	/// @brief Called on every mouse event during a hold
 	virtual void UpdateHold() { }
 	/// @brief Called when the hold ended

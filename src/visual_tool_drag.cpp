@@ -316,6 +316,12 @@ bool VisualToolDrag::InitializeDrag(Feature *feature) {
 	return true;
 }
 
+void VisualToolDrag::OnEmptyClick() {
+	// The canvas already owns keyboard focus; stop treating its arrow keys as
+	// nudges until a subtitle handle is explicitly selected again.
+	primary = nullptr;
+}
+
 bool VisualToolDrag::EnsureFrameSegment(Feature *feature) {
 	if (!segment_by_frame || !feature || !feature->line) return false;
 	auto *line = feature->line;
