@@ -15,6 +15,8 @@ namespace ass::templates {
 
 enum class Scope { Global, Project };
 
+inline constexpr std::string_view BodyPlaceholder = "{{正文}}";
+
 struct Entry {
 	std::string id;
 	std::string name;
@@ -33,6 +35,16 @@ struct Parameter {
 std::string Encode(std::vector<Entry> const& entries, Scope scope);
 /// Decode templates without discarding the rest when one record is malformed.
 std::vector<Entry> Decode(std::string_view source, Scope scope);
+
+/// Convert a dialogue Text field into reusable ASS structure with one body
+/// placeholder. Existing templates which already contain the placeholder are
+/// returned unchanged.
+std::string MakeStructure(std::string_view source);
+/// Read the visible body while discarding the line's existing ASS structure.
+std::string ExtractBody(std::string_view source);
+/// Fill a reusable structure with a new body. Legacy full-line templates are
+/// converted to reusable structure before being applied.
+std::string ApplyStructure(std::string_view structure, std::string_view body);
 
 /// Find useful values which can be changed when applying a template.
 std::vector<Parameter> ExtractParameters(std::string_view source);
