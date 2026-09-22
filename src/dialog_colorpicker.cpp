@@ -771,6 +771,7 @@ DialogColorPicker::DialogColorPicker(wxWindow *parent, agi::Color initial_color,
 						left->Show(video_frame_picker, !video_frame_picker->IsShown());
 						GetSizer()->Fit(this);
 						Layout();
+						Position(GetParent()->ClientToScreen(wxPoint(0, 0)), GetParent()->GetSize());
 					});
 				}
 			}
