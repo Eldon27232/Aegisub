@@ -28,6 +28,7 @@
 #include "../visual_tool_rotatez.h"
 #include "../visual_tool_scale.h"
 #include "../visual_tool_screen_mask.h"
+#include "../visual_tool_subtitle_mask.h"
 #include "../visual_tool_vector_clip.h"
 
 
@@ -166,6 +167,14 @@ namespace {
 		STR_MENU("快速画面遮罩")
 		STR_DISP("快速画面遮罩")
 		STR_HELP("直接在视频画面上绘制标准 ASS Drawing 遮罩")
+	};
+
+	struct visual_mode_subtitle_mask final : public visual_tool_command<VisualToolSubtitleMask> {
+		CMD_NAME("video/tool/subtitle_mask")
+		CMD_ICON(visual_vector_clip)
+		STR_MENU("字幕遮挡")
+		STR_DISP("字幕遮挡")
+		STR_HELP("从当前帧开始用标准 ASS 反向裁剪隐藏所选字幕的局部区域")
 	};
 
 	// Perspective settings
@@ -347,6 +356,7 @@ namespace cmd {
 		reg(std::make_unique<visual_mode_clip>());
 		reg(std::make_unique<visual_mode_vector_clip>());
 		reg(std::make_unique<visual_mode_screen_mask>());
+		reg(std::make_unique<visual_mode_subtitle_mask>());
 
 		reg(std::make_unique<visual_mode_vclip_drag>());
 		reg(std::make_unique<visual_mode_vclip_line>());
