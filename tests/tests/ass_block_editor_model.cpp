@@ -12,6 +12,7 @@
 
 using ass::blocks::ItemKind;
 using ass::blocks::Model;
+using ass::blocks::Origin;
 
 TEST(ass_block_editor_model, untouched_source_is_byte_exact_and_unknown_content_is_raw) {
 	std::string source =
@@ -89,6 +90,126 @@ TEST(ass_block_editor_model, reparses_direct_source_edits_into_blocks) {
 	ASSERT_GE(model.Items().size(), 3u);
 	EXPECT_EQ("Position", model.Items()[0].label);
 	EXPECT_EQ(ItemKind::Raw, model.Items()[1].kind);
+	EXPECT_EQ(Origin::Gui, model.Items()[0].origin);
+	EXPECT_EQ(Origin::Raw, model.Items()[1].origin);
+	EXPECT_EQ(Origin::Manual, model.Items()[2].origin);
+}
+
+TEST(ass_block_editor_model, stored_source_without_valid_ownership_stays_manual_and_opaque) {
+	std::string source = "手写 \\n \\N {\\pos(114,514)} {invalid";
+	Model model;
+	model.SetStoredSource(source, {});
+
+	ASSERT_EQ(1u, model.Items().size());
+	EXPECT_EQ(ItemKind::Text, model.Items()[0].kind);
+	EXPECT_EQ(Origin::Manual, model.Items()[0].origin);
+	EXPECT_EQ(source, model.Items()[0].source);
+	EXPECT_EQ(source, model.Serialize());
+
+	std::string edited = "\\N{\\pos(500,500)}\\n";
+	ASSERT_TRUE(model.ReplaceManual(0, edited));
+	ASSERT_EQ(1u, model.Items().size());
+	EXPECT_EQ(ItemKind::Text, model.Items()[0].kind);
+	EXPECT_EQ(Origin::Manual, model.Items()[0].origin);
+	EXPECT_EQ(edited, model.Serialize());
+}
+
+TEST(ass_block_editor_model, empty_stored_source_has_an_editable_manual_item) {
+	Model model;
+	model.SetStoredSource("", {});
+	ASSERT_EQ(1u, model.Items().size());
+	EXPECT_EQ(ItemKind::Text, model.Items()[0].kind);
+	EXPECT_EQ(Origin::Manual, model.Items()[0].origin);
+	EXPECT_EQ("", model.Serialize());
+	EXPECT_TRUE(model.ReplaceManual(0, "正文"));
+	EXPECT_EQ("正文", model.Serialize());
+}
+
+TEST(ass_block_editor_model, empty_manual_placeholder_survives_before_gui_structure) {
+	Model model;
+	model.SetStoredSource("", {});
+	auto const& features = Model::Features();
+	auto bold = std::find_if(features.begin(), features.end(), [](auto const& feature) {
+		return feature.tag == "b";
+	});
+	ASSERT_NE(features.end(), bold);
+	ASSERT_TRUE(model.Insert(0, *bold));
+	EXPECT_EQ("{\\b1}", model.Serialize());
+	ASSERT_EQ(2u, model.Items().size());
+	EXPECT_EQ(Origin::Manual, model.Items()[0].origin);
+	EXPECT_EQ("", model.Items()[0].source);
+
+	Model restored;
+	restored.SetStoredSource(model.Serialize(), model.OriginMetadata());
+	ASSERT_EQ(2u, restored.Items().size());
+	EXPECT_EQ(ItemKind::Text, restored.Items()[0].kind);
+	EXPECT_EQ(Origin::Manual, restored.Items()[0].origin);
+	EXPECT_EQ("", restored.Items()[0].source);
+	EXPECT_EQ(ItemKind::Tag, restored.Items()[1].kind);
+	EXPECT_EQ(Origin::Gui, restored.Items()[1].origin);
+}
+
+TEST(ass_block_editor_model, manual_and_gui_runs_survive_metadata_roundtrip) {
+	Model model;
+	model.SetStoredSource("目标正文", {});
+	auto const& features = Model::Features();
+	auto position = std::find_if(features.begin(), features.end(), [](auto const& feature) {
+		return feature.tag == "pos";
+	});
+	ASSERT_NE(features.end(), position);
+	ASSERT_TRUE(model.Insert(0, *position));
+	EXPECT_EQ("目标正文{\\pos(0,0)}", model.Serialize());
+	ASSERT_EQ(2u, model.Items().size());
+	EXPECT_EQ(Origin::Manual, model.Items()[0].origin);
+	EXPECT_EQ(Origin::Gui, model.Items()[1].origin);
+
+	ASSERT_TRUE(model.ReplaceManual(0, "手写{\\an8}\\N"));
+	auto source = model.Serialize();
+	auto metadata = model.OriginMetadata();
+	EXPECT_EQ(std::string_view("aegisub.ass-block-origins"), ass::blocks::kOriginExtradataKey);
+	EXPECT_EQ(0u, metadata.find("v1;"));
+
+	Model restored;
+	restored.SetStoredSource(source, metadata);
+	EXPECT_EQ(source, restored.Serialize());
+	ASSERT_EQ(2u, restored.Items().size());
+	EXPECT_EQ(ItemKind::Text, restored.Items()[0].kind);
+	EXPECT_EQ("手写{\\an8}\\N", restored.Items()[0].source);
+	EXPECT_EQ(Origin::Manual, restored.Items()[0].origin);
+	EXPECT_EQ(ItemKind::Tag, restored.Items()[1].kind);
+	EXPECT_EQ(Origin::Gui, restored.Items()[1].origin);
+	EXPECT_EQ(metadata, restored.OriginMetadata());
+}
+
+TEST(ass_block_editor_model, stale_metadata_falls_back_to_manual_instead_of_taking_over) {
+	Model original;
+	original.SetSource("{\\pos(1,2)}old");
+	auto metadata = original.OriginMetadata();
+
+	Model restored;
+	restored.SetStoredSource("{\\pos(9,9)}new", metadata);
+	ASSERT_EQ(1u, restored.Items().size());
+	EXPECT_EQ(ItemKind::Text, restored.Items()[0].kind);
+	EXPECT_EQ(Origin::Manual, restored.Items()[0].origin);
+	EXPECT_EQ("{\\pos(9,9)}new", restored.Serialize());
+}
+
+TEST(ass_block_editor_model, direct_source_takeover_persists_known_gui_and_unknown_raw_items) {
+	std::string source = "{\\pos(844,306.67)\\vendor(x)}正文\\N";
+	Model model;
+	model.SetSource(source);
+	auto metadata = model.OriginMetadata();
+
+	Model restored;
+	restored.SetStoredSource(source, metadata);
+	EXPECT_EQ(source, restored.Serialize());
+	ASSERT_GE(restored.Items().size(), 3u);
+	EXPECT_EQ(ItemKind::Tag, restored.Items()[0].kind);
+	EXPECT_EQ(Origin::Gui, restored.Items()[0].origin);
+	EXPECT_EQ(ItemKind::Raw, restored.Items()[1].kind);
+	EXPECT_EQ(Origin::Raw, restored.Items()[1].origin);
+	EXPECT_EQ(ItemKind::Text, restored.Items()[2].kind);
+	EXPECT_EQ(Origin::Manual, restored.Items()[2].origin);
 }
 
 TEST(ass_block_editor_model, live_colour_changes_reuse_channel_alpha) {

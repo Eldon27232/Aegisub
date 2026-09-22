@@ -16,6 +16,16 @@
 
 namespace ass::blocks {
 
+/// Extradata key used to persist which portions of a dialogue line are owned
+/// by the block editor. The dialogue Text itself always remains standard ASS.
+inline constexpr std::string_view kOriginExtradataKey = "aegisub.ass-block-origins";
+
+enum class Origin {
+	Manual,
+	Gui,
+	Raw
+};
+
 enum class ItemKind {
 	Tag,
 	Text,
@@ -26,6 +36,7 @@ enum class ItemKind {
 
 struct Item {
 	ItemKind kind = ItemKind::Raw;
+	Origin origin = Origin::Raw;
 	std::string label;
 	std::string category;
 	std::string source;
@@ -44,8 +55,15 @@ struct Feature {
 /// source is returned byte-for-byte; edits rebuild only the affected block.
 class Model final {
 public:
+	/// Parse a direct edit of the complete ASS source. Recognized override
+	/// blocks are explicitly taken over by the GUI; plain text stays manual.
 	void SetSource(std::string source);
+	/// Restore source plus persisted ownership. Missing, stale or malformed
+	/// metadata is deliberately treated as one opaque manual text item.
+	void SetStoredSource(std::string source, std::string_view origin_metadata);
 	std::string Serialize() const;
+	/// Versioned, source-bound ownership runs suitable for Extradata.
+	std::string OriginMetadata() const;
 	std::vector<Item> const& Items() const noexcept { return items_; }
 
 	std::string Copy(std::vector<size_t> selection) const;
@@ -53,6 +71,8 @@ public:
 	bool Delete(std::vector<size_t> selection);
 	bool Paste(std::optional<size_t> after, std::string_view source);
 	bool Replace(size_t item, std::string_view source);
+	/// Replace a plain-text item without parsing ASS-looking input.
+	bool ReplaceManual(size_t item, std::string_view source);
 	bool Insert(std::optional<size_t> after, Feature const& feature);
 
 	/// Colour tags use the same picker at top level and inside transforms.
@@ -64,7 +84,7 @@ public:
 	static std::vector<Feature> SearchFeatures(std::string_view query);
 
 private:
-	enum class PartKind { Text, Comment, Override, Drawing };
+	enum class PartKind { Text, Comment, Override, Drawing, Raw };
 	struct Node {
 		std::string source;
 		std::string name;
@@ -73,6 +93,7 @@ private:
 	};
 	struct Part {
 		PartKind kind = PartKind::Text;
+		Origin origin = Origin::Manual;
 		std::string original;
 		std::vector<Node> nodes;
 		bool dirty = false;
