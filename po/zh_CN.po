@@ -7874,3 +7874,355 @@ msgstr "可以直接修改位置、颜色、字号、动画时间和正文；留
 #: ../src/ass_block_editor_model.cpp
 msgid "Z rotation"
 msgstr "Z 轴旋转"
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+#, c-format
+msgid "Logical group (%d subtitles)"
+msgstr "逻辑组（%d 条字幕）"
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "Color - changes apply immediately"
+msgstr "颜色（修改立即生效）"
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "Hue (degrees)"
+msgstr "色相（度）"
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "Saturation (%)"
+msgstr "饱和度（%）"
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "Brightness (%)"
+msgstr "亮度（%）"
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "Opacity (%)"
+msgstr "不透明度（%）"
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "RGB Hex"
+msgstr "RGB 色值"
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "ASS BGR Hex"
+msgstr "ASS BGR 色值"
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "Eyedropper"
+msgstr "吸色笔"
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "Click or drag to pick a color from the screen"
+msgstr "点击或拖动，在屏幕上吸取颜色"
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "Recent colors"
+msgstr "最近使用"
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "Project colors"
+msgstr "项目常用"
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "Pick from current video frame"
+msgstr "从当前视频画面吸色"
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "add fold"
+msgstr "建立逻辑组"
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "clear all folds"
+msgstr "释放全部逻辑组"
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "open all folds"
+msgstr "展开全部逻辑组"
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "close all folds"
+msgstr "收起全部逻辑组"
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "clear folds"
+msgstr "释放逻辑组"
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "open folds"
+msgstr "展开逻辑组"
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "close folds"
+msgstr "收起逻辑组"
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "toggle folds"
+msgstr "展开或收起逻辑组"
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid " >"
+msgstr " >"
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "Folds"
+msgstr "逻辑组"
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "Top left"
+msgstr "左上"
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "Top"
+msgstr "上"
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "Top right"
+msgstr "右上"
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "Center"
+msgstr "中"
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "Bottom left"
+msgstr "左下"
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "Bottom"
+msgstr "下"
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "Bottom right"
+msgstr "右下"
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "Enabled"
+msgstr "启用"
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "Balanced, wider first line"
+msgstr "均衡换行（首行较宽）"
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "Wrap at line end"
+msgstr "到行末换行"
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "No automatic wrapping"
+msgstr "不自动换行"
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "Balanced, wider last line"
+msgstr "均衡换行（末行较宽）"
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "From X"
+msgstr "起点 X"
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "From Y"
+msgstr "起点 Y"
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "To X"
+msgstr "终点 X"
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "To Y"
+msgstr "终点 Y"
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "Start (ms)"
+msgstr "开始（毫秒）"
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "End (ms)"
+msgstr "结束（毫秒）"
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "Acceleration"
+msgstr "加速度"
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "Fade out (ms)"
+msgstr "淡出（毫秒）"
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "Fade in (ms)"
+msgstr "淡入（毫秒）"
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "Start opacity (%)"
+msgstr "起始不透明度（%）"
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "Hold opacity (%)"
+msgstr "保持不透明度（%）"
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "End opacity (%)"
+msgstr "结束不透明度（%）"
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "Fade in start (ms)"
+msgstr "淡入起点（毫秒）"
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "Fade in end (ms)"
+msgstr "淡入终点（毫秒）"
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "Fade out start (ms)"
+msgstr "淡出起点（毫秒）"
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "Fade out end (ms)"
+msgstr "淡出终点（毫秒）"
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "Degrees"
+msgstr "度"
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "Centiseconds"
+msgstr "厘秒（1/100 秒）"
+
+
+#: src/visual_tool_screen_mask.cpp src/visual_tool_subtitle_mask.cpp src/video_box.cpp
+msgid "Screen mask"
+msgstr "画面遮罩"
+
+
+#: src/visual_tool_screen_mask.cpp src/visual_tool_subtitle_mask.cpp src/video_box.cpp
+msgid "Select / adjust"
+msgstr "选择 / 调整"
+
+
+#: src/visual_tool_screen_mask.cpp src/visual_tool_subtitle_mask.cpp src/video_box.cpp
+msgid "Rectangle"
+msgstr "矩形"
+
+
+#: src/visual_tool_screen_mask.cpp src/visual_tool_subtitle_mask.cpp src/video_box.cpp
+msgid "Polygon / path"
+msgstr "多边形 / 路径"
+
+
+#: src/visual_tool_screen_mask.cpp src/visual_tool_subtitle_mask.cpp src/video_box.cpp
+msgid "Tool"
+msgstr "工具"
+
+
+#: src/visual_tool_screen_mask.cpp src/visual_tool_subtitle_mask.cpp src/video_box.cpp
+msgid "Close polygon"
+msgstr "闭合路径"
+
+
+#: src/visual_tool_screen_mask.cpp src/visual_tool_subtitle_mask.cpp src/video_box.cpp
+msgid "Fill color"
+msgstr "填充颜色"
+
+
+#: src/visual_tool_screen_mask.cpp src/visual_tool_subtitle_mask.cpp src/video_box.cpp
+msgid "N frames"
+msgstr "N 帧"
+
+
+#: src/visual_tool_screen_mask.cpp src/visual_tool_subtitle_mask.cpp src/video_box.cpp
+msgid "Until time"
+msgstr "到指定时间"
+
+
+#: src/visual_tool_screen_mask.cpp src/visual_tool_subtitle_mask.cpp src/video_box.cpp
+msgid "Until subtitle end"
+msgstr "到当前字幕结束"
+
+
+#: src/visual_tool_screen_mask.cpp src/visual_tool_subtitle_mask.cpp src/video_box.cpp
+msgid "Custom frame range"
+msgstr "自定义帧范围"
+
+
+#: src/visual_tool_screen_mask.cpp src/visual_tool_subtitle_mask.cpp src/video_box.cpp
+msgid "Drag a rectangle; click points then the first point to close a path."
+msgstr "拖动画出矩形；逐点点击，最后点击起点闭合路径。"
+
+
+#: src/visual_tool_screen_mask.cpp src/visual_tool_subtitle_mask.cpp src/video_box.cpp
+msgid "Subtitle occlusion"
+msgstr "字幕遮挡"
+
+
+#: src/visual_tool_screen_mask.cpp src/visual_tool_subtitle_mask.cpp src/video_box.cpp
+msgid "Hide an area of the selected subtitle, not the video."
+msgstr "只隐藏选中字幕的区域，不遮挡视频画面。"
+
+
+#: src/visual_tool_screen_mask.cpp src/visual_tool_subtitle_mask.cpp src/video_box.cpp
+msgid "Changes replace the mask from this frame onward.\nDrag the shape or its points to adjust it."
+msgstr "修改从当前帧开始替换遮挡状态。\n拖动形状或控制点即可调整。"
+
+
+#: src/visual_tool_screen_mask.cpp src/visual_tool_subtitle_mask.cpp src/video_box.cpp
+#, c-format
+msgid "Current frame: %d - until subtitle end"
+msgstr "当前帧：%d — 持续到字幕结束"
+
+
+#: src/visual_tool_screen_mask.cpp
+msgid "Drag a rectangle.\nFor a path, click points, then click the first point."
+msgstr "拖动画出矩形。\n绘制路径时逐点点击，最后点击起点闭合。"
