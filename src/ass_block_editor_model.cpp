@@ -252,6 +252,38 @@ void Model::SetSource(std::string source) {
 	RebuildItems();
 }
 
+void Model::SetSourceWithManualSpan(std::string source, size_t offset, size_t length) {
+	if (offset > source.size() || length > source.size() - offset) {
+		SetStoredSource(std::move(source), {});
+		return;
+	}
+
+	original_ = std::move(source);
+	parts_.clear();
+	auto append_structure = [this](std::string_view text) {
+		auto parsed = ParseParts(text);
+		for (auto& part : parsed) {
+			if (part.kind != PartKind::Comment && part.kind != PartKind::Drawing &&
+				part.kind != PartKind::Raw)
+				part.origin = Origin::Gui;
+		}
+		parts_.insert(parts_.end(),
+			std::make_move_iterator(parsed.begin()),
+			std::make_move_iterator(parsed.end()));
+	};
+
+	auto view = std::string_view(original_);
+	append_structure(view.substr(0, offset));
+	Part manual;
+	manual.kind = PartKind::Text;
+	manual.origin = Origin::Manual;
+	manual.original = std::string(view.substr(offset, length));
+	parts_.push_back(std::move(manual));
+	append_structure(view.substr(offset + length));
+	dirty_ = false;
+	RebuildItems();
+}
+
 void Model::SetStoredSource(std::string source, std::string_view origin_metadata) {
 	original_ = std::move(source);
 	parts_.clear();

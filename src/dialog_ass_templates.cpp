@@ -6,6 +6,7 @@
 
 #include "dialog_ass_templates.h"
 
+#include "ass_block_editor_model.h"
 #include "ass_dialogue.h"
 #include "ass_file.h"
 #include "ass_template_store.h"
@@ -41,6 +42,39 @@
 namespace {
 using ass::templates::Entry;
 using ass::templates::Scope;
+
+std::string BlockOriginMetadata(agi::Context *context, AssDialogue const& dialogue) {
+	for (auto const& entry : context->ass->GetExtradata(dialogue.ExtradataIds)) {
+		if (entry.key == ass::blocks::kOriginExtradataKey)
+			return entry.value;
+	}
+	return {};
+}
+
+std::string ExtractTemplateBody(agi::Context *context, AssDialogue const& dialogue) {
+	ass::blocks::Model model;
+	model.SetStoredSource(dialogue.Text.get(), BlockOriginMetadata(context, dialogue));
+	std::vector<size_t> body_items;
+	auto const& items = model.Items();
+	for (size_t i = 0; i < items.size(); ++i) {
+		if (items[i].origin != ass::blocks::Origin::Gui)
+			body_items.push_back(i);
+	}
+	return model.Copy(std::move(body_items));
+}
+
+void ApplyTemplate(agi::Context *context, AssDialogue& dialogue,
+	std::string_view structure, std::string_view body) {
+	auto reusable = ass::templates::MakeStructure(structure);
+	auto body_offset = reusable.find(ass::templates::BodyPlaceholder);
+	auto source = ass::templates::ApplyStructure(reusable, body);
+
+	ass::blocks::Model model;
+	model.SetSourceWithManualSpan(source, body_offset, body.size());
+	dialogue.Text = source;
+	context->ass->SetExtradataValue(dialogue,
+		std::string(ass::blocks::kOriginExtradataKey), model.OriginMetadata());
+}
 
 class TemplateDetailsDialog final : public wxDialog {
 	wxTextCtrl *name;
@@ -294,9 +328,10 @@ class TemplateManagerDialog final : public wxDialog {
 		if (!index || !active) return;
 		auto structure = PreparedStructure(entries[*index]);
 		if (!structure) return;
-		auto body = ass::templates::ExtractBody(active->Text.get());
-		active->Text = ass::templates::ApplyStructure(*structure, body);
-		context->ass->Commit(_("Apply subtitle template"), AssFile::COMMIT_DIAG_TEXT, -1, active);
+		auto body = ExtractTemplateBody(context, *active);
+		ApplyTemplate(context, *active, *structure, body);
+		context->ass->Commit(_("Apply subtitle template"),
+			AssFile::COMMIT_DIAG_TEXT | AssFile::COMMIT_EXTRADATA, -1, active);
 		result = AssTemplateDialogResult::AppliedCurrent;
 		EndModal(wxID_OK);
 	}
@@ -316,9 +351,10 @@ class TemplateManagerDialog final : public wxDialog {
 			if (&dialogue != active && dialogue.Start >= created->Start)
 				created->End = std::min(created->End, dialogue.Start);
 		}
-		created->Text = ass::templates::ApplyStructure(*structure, {});
+		ApplyTemplate(context, *created, *structure, {});
 		context->ass->Events.insert(++context->ass->iterator_to(*active), *created);
-		context->ass->Commit(_("Create subtitle and apply template"), AssFile::COMMIT_DIAG_ADDREM);
+		context->ass->Commit(_("Create subtitle and apply template"),
+			AssFile::COMMIT_DIAG_ADDREM | AssFile::COMMIT_EXTRADATA);
 		context->selectionController->SetSelectionAndActive({created}, created);
 		result = AssTemplateDialogResult::AppliedNew;
 		EndModal(wxID_OK);

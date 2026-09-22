@@ -58,6 +58,9 @@ public:
 	/// Parse a direct edit of the complete ASS source. Recognized override
 	/// blocks are explicitly taken over by the GUI; plain text stays manual.
 	void SetSource(std::string source);
+	/// Parse GUI-owned structure around one opaque manual text span. Invalid
+	/// bounds fall back to treating the complete source as manual.
+	void SetSourceWithManualSpan(std::string source, size_t offset, size_t length);
 	/// Restore source plus persisted ownership. Missing, stale or malformed
 	/// metadata is deliberately treated as one opaque manual text item.
 	void SetStoredSource(std::string source, std::string_view origin_metadata);

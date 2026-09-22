@@ -176,6 +176,72 @@ TEST(ass_block_editor_model, direct_override_source_appends_persisted_manual_bod
 	EXPECT_EQ("", restored.Items()[2].source);
 }
 
+TEST(ass_block_editor_model, structured_source_keeps_ass_looking_body_manual) {
+	std::string prefix = "{\\an8}{note}";
+	std::string body = "手写{\\pos(114,514)}\\N";
+	std::string suffix = "{\\i1}";
+	std::string source = prefix + body + suffix;
+	Model model;
+	model.SetSourceWithManualSpan(source, prefix.size(), body.size());
+
+	EXPECT_EQ(source, model.Serialize());
+	ASSERT_EQ(4u, model.Items().size());
+	EXPECT_EQ(ItemKind::Tag, model.Items()[0].kind);
+	EXPECT_EQ(Origin::Gui, model.Items()[0].origin);
+	EXPECT_EQ(Origin::Raw, model.Items()[1].origin);
+	EXPECT_EQ(ItemKind::Text, model.Items()[2].kind);
+	EXPECT_EQ(Origin::Manual, model.Items()[2].origin);
+	EXPECT_EQ(body, model.Items()[2].source);
+	EXPECT_EQ(ItemKind::Tag, model.Items()[3].kind);
+	EXPECT_EQ(Origin::Gui, model.Items()[3].origin);
+
+	Model restored;
+	restored.SetStoredSource(source, model.OriginMetadata());
+	EXPECT_EQ(source, restored.Serialize());
+	ASSERT_EQ(4u, restored.Items().size());
+	EXPECT_EQ(Origin::Gui, restored.Items()[0].origin);
+	EXPECT_EQ(Origin::Raw, restored.Items()[1].origin);
+	EXPECT_EQ(ItemKind::Text, restored.Items()[2].kind);
+	EXPECT_EQ(Origin::Manual, restored.Items()[2].origin);
+	EXPECT_EQ(body, restored.Items()[2].source);
+	EXPECT_EQ(Origin::Gui, restored.Items()[3].origin);
+}
+
+TEST(ass_block_editor_model, structured_source_persists_empty_manual_span_in_place) {
+	std::string prefix = "{\\b1}";
+	std::string suffix = "{\\i1}";
+	Model model;
+	model.SetSourceWithManualSpan(prefix + suffix, prefix.size(), 0);
+
+	ASSERT_EQ(3u, model.Items().size());
+	EXPECT_EQ(Origin::Gui, model.Items()[0].origin);
+	EXPECT_EQ(ItemKind::Text, model.Items()[1].kind);
+	EXPECT_EQ(Origin::Manual, model.Items()[1].origin);
+	EXPECT_EQ("", model.Items()[1].source);
+	EXPECT_EQ(Origin::Gui, model.Items()[2].origin);
+	auto metadata = model.OriginMetadata();
+	EXPECT_NE(std::string::npos, metadata.find(",M0,"));
+
+	Model restored;
+	restored.SetStoredSource(model.Serialize(), metadata);
+	ASSERT_EQ(3u, restored.Items().size());
+	EXPECT_EQ(Origin::Gui, restored.Items()[0].origin);
+	EXPECT_EQ(Origin::Manual, restored.Items()[1].origin);
+	EXPECT_EQ("", restored.Items()[1].source);
+	EXPECT_EQ(Origin::Gui, restored.Items()[2].origin);
+}
+
+TEST(ass_block_editor_model, invalid_manual_span_defaults_complete_source_to_manual) {
+	std::string source = "{\\pos(1,2)}正文";
+	Model model;
+	model.SetSourceWithManualSpan(source, source.size() + 1, 0);
+	ASSERT_EQ(1u, model.Items().size());
+	EXPECT_EQ(ItemKind::Text, model.Items()[0].kind);
+	EXPECT_EQ(Origin::Manual, model.Items()[0].origin);
+	EXPECT_EQ(source, model.Items()[0].source);
+	EXPECT_EQ(source, model.Serialize());
+}
+
 TEST(ass_block_editor_model, manual_and_gui_runs_survive_metadata_roundtrip) {
 	Model model;
 	model.SetStoredSource("目标正文", {});
