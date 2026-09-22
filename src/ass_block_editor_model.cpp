@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <charconv>
 #include <iterator>
 #include <unordered_map>
 
@@ -70,6 +71,49 @@ template<class T>
 void sort_unique(T& values) {
 	std::sort(values.begin(), values.end());
 	values.erase(std::unique(values.begin(), values.end()), values.end());
+}
+
+struct ColourLocation {
+	ast::OverrideBlock *scope;
+	size_t node;
+	std::string alpha_tag;
+};
+
+agi::Color ass_colour_value(std::string_view value) {
+	// The generic CSS/colour parser expects full-width colour strings; ASS
+	// alpha is a two-digit hex value and ASS RGB also permits short hex values.
+	auto first = value.find_first_not_of(" \t\r\n");
+	if (first != std::string_view::npos) value.remove_prefix(first);
+	auto last = value.find_last_not_of(" \t\r\n");
+	if (last != std::string_view::npos) value = value.substr(0, last + 1);
+	if (value.size() >= 2 && value[0] == '&' && (value[1] == 'H' || value[1] == 'h')) {
+		value.remove_prefix(2);
+		if (!value.empty() && value.back() == '&') value.remove_suffix(1);
+		unsigned parsed = 0;
+		auto [end, error] = std::from_chars(value.data(), value.data() + value.size(), parsed, 16);
+		if (error == std::errc() && end == value.data() + value.size())
+			return agi::Color(parsed & 0xFF, (parsed >> 8) & 0xFF, (parsed >> 16) & 0xFF);
+		return {};
+	}
+	return agi::Color(value);
+}
+
+std::optional<ColourLocation> find_colour(ast::OverrideBlock& block, size_t node,
+	std::vector<size_t> const& nested_path) {
+	auto scope = &block;
+	for (auto child : nested_path) {
+		auto parent = scope->MutableNode(node);
+		if (!parent || !parent->Transform()) return {};
+		scope = parent->Transform();
+		node = child;
+	}
+	auto target = scope->MutableNode(node);
+	if (!target) return {};
+	auto const& name = target->Name();
+	if (name == "\\c") return ColourLocation{scope, node, "\\1a"};
+	if (name == "\\1c" || name == "\\2c" || name == "\\3c" || name == "\\4c")
+		return ColourLocation{scope, node, std::string("\\") + name[1] + "a"};
+	return {};
 }
 
 } // namespace
@@ -319,6 +363,60 @@ bool Model::Replace(size_t item, std::string_view source) {
 
 bool Model::Insert(std::optional<size_t> after, Feature const& feature) {
 	return Paste(after, feature.source);
+}
+
+agi::Color Model::GetColour(size_t item, std::vector<size_t> nested_path) const {
+	agi::Color colour(255, 255, 255, 0);
+	if (item >= locations_.size() || !locations_[item].is_node) return colour;
+	auto const& location = locations_[item];
+	auto block = ast::OverrideBlock::Parse(SerializePart(parts_[location.part]));
+	auto target = find_colour(block, location.node, nested_path);
+	if (!target) return colour;
+	auto node = target->scope->MutableNode(target->node);
+	if (!node->Arguments().empty() && !node->Arguments()[0].empty())
+		colour = ass_colour_value(node->Arguments()[0]);
+	// Override colours carry RGB only. The last global/channel alpha in this
+	// exact scope determines opacity; transform bodies do not leak into it.
+	colour.a = 0;
+	for (auto const& sibling : target->scope->Nodes()) {
+		if (sibling.Name() == "\\r") colour.a = 0;
+		else if (sibling.Name() == "\\alpha" || sibling.Name() == target->alpha_tag)
+			colour.a = sibling.Arguments().empty() ? 0 : ass_colour_value(sibling.Arguments()[0]).r;
+	}
+	return colour;
+}
+
+bool Model::SetColour(size_t item, std::vector<size_t> nested_path, agi::Color colour) {
+	if (item >= locations_.size() || !locations_[item].is_node) return false;
+	auto const location = locations_[item];
+	auto& part = parts_[location.part];
+	auto block = ast::OverrideBlock::Parse(SerializePart(part));
+	auto target = find_colour(block, location.node, nested_path);
+	if (!target) return false;
+	target->scope->MutableNode(target->node)->SetArgument(0, colour.GetAssOverrideFormatted());
+
+	// Reuse the final effective channel alpha. If a later global alpha/reset
+	// overrides it, append one channel-specific value after that override.
+	// Subsequent live picker updates reuse this node rather than accumulating.
+	std::optional<size_t> alpha_node;
+	auto const& siblings = target->scope->Nodes();
+	for (size_t i = 0; i < siblings.size(); ++i) {
+		if (siblings[i].Name() == "\\alpha" || siblings[i].Name() == "\\r") alpha_node.reset();
+		else if (siblings[i].Name() == target->alpha_tag) alpha_node = i;
+	}
+	auto alpha = agi::format("&H%02X&", int(colour.a));
+	if (alpha_node)
+		target->scope->MutableNode(*alpha_node)->SetArgument(0, alpha);
+	else
+		target->scope->AppendTag(target->alpha_tag + alpha);
+
+	part.nodes.clear();
+	for (auto const& node : block.Nodes())
+		part.nodes.push_back({node.Serialize(), node.Name(), node.IsKnownTag(), node.Kind() == ast::OverrideNodeKind::Tag});
+	part.dirty = true;
+	dirty_ = true;
+	RebuildItems();
+	return true;
 }
 
 std::vector<Feature> const& Model::Features() {

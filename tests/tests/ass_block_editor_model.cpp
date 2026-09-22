@@ -90,3 +90,63 @@ TEST(ass_block_editor_model, reparses_direct_source_edits_into_blocks) {
 	EXPECT_EQ("Position", model.Items()[0].label);
 	EXPECT_EQ(ItemKind::Raw, model.Items()[1].kind);
 }
+
+TEST(ass_block_editor_model, live_colour_changes_reuse_channel_alpha) {
+	Model model;
+	model.SetSource("{\\1c&HFFFFFF&}text");
+	EXPECT_EQ(agi::Color(255, 255, 255, 0), model.GetColour(0));
+	ASSERT_TRUE(model.SetColour(0, {}, agi::Color(255, 127, 168, 128)));
+	EXPECT_EQ("{\\1c&HA87FFF&\\1a&H80&}text", model.Serialize());
+	ASSERT_TRUE(model.SetColour(0, {}, agi::Color(16, 32, 48, 64)));
+	EXPECT_EQ("{\\1c&H302010&\\1a&H40&}text", model.Serialize());
+	EXPECT_EQ(agi::Color(16, 32, 48, 64), model.GetColour(0));
+	EXPECT_EQ(3U, model.Items().size());
+}
+
+TEST(ass_block_editor_model, channel_opacity_is_effective_after_later_global_alpha) {
+	Model model;
+	model.SetSource("{\\alpha&H40&\\3c&H010203&\\3a&H80&\\alpha&H20&\\2a&H90&}text");
+	EXPECT_EQ(agi::Color(3, 2, 1, 0x20), model.GetColour(1));
+	ASSERT_TRUE(model.SetColour(1, {}, agi::Color(255, 127, 168, 0xAA)));
+	EXPECT_EQ("{\\alpha&H40&\\3c&HA87FFF&\\3a&H80&\\alpha&H20&\\2a&H90&\\3a&HAA&}text", model.Serialize());
+	EXPECT_EQ(agi::Color(255, 127, 168, 0xAA), model.GetColour(1));
+	ASSERT_TRUE(model.SetColour(1, {}, agi::Color(255, 127, 168, 0x88)));
+	EXPECT_EQ("{\\alpha&H40&\\3c&HA87FFF&\\3a&H80&\\alpha&H20&\\2a&H90&\\3a&H88&}text", model.Serialize());
+}
+
+TEST(ass_block_editor_model, primary_alias_updates_existing_effective_alpha_only) {
+	Model model;
+	model.SetSource("{\\alpha&HFF&\\c&H102030&\\1a&H40&\\4a&H99&}text");
+	EXPECT_EQ(agi::Color(0x30, 0x20, 0x10, 0x40), model.GetColour(1));
+	ASSERT_TRUE(model.SetColour(1, {}, agi::Color(255, 0, 0, 0x55)));
+	EXPECT_EQ("{\\alpha&HFF&\\c&H0000FF&\\1a&H55&\\4a&H99&}text", model.Serialize());
+}
+
+TEST(ass_block_editor_model, transform_colour_preserves_animation_neighbors_and_raw) {
+	Model model;
+	model.SetSource("head{\\alpha&H20&\\t(0,250,\\3c&HFFFFFF&\\bord3\\vendor(foo,(bar,baz))\\alpha&H70&\\4a&H22&)\\1c&H112233&}tail{note}");
+	EXPECT_EQ(agi::Color(255, 255, 255, 0x70), model.GetColour(2, {0}));
+	ASSERT_TRUE(model.SetColour(2, {0}, agi::Color(255, 127, 168, 0x80)));
+	EXPECT_EQ("head{\\alpha&H20&\\t(0,250,\\3c&HA87FFF&\\bord3\\vendor(foo,(bar,baz))\\alpha&H70&\\4a&H22&\\3a&H80&)\\1c&H112233&}tail{note}", model.Serialize());
+	EXPECT_EQ(agi::Color(255, 127, 168, 0x80), model.GetColour(2, {0}));
+	EXPECT_EQ(agi::Color(0x33, 0x22, 0x11, 0x20), model.GetColour(3));
+}
+
+TEST(ass_block_editor_model, nested_transform_path_changes_only_its_own_colour_scope) {
+	Model model;
+	model.SetSource("{\\t(0,100,\\t(0,50,\\1c&HFF&\\1a&H20&)\\bord2)\\vendor(raw)}text");
+	EXPECT_EQ(agi::Color(255, 0, 0, 0x20), model.GetColour(0, {0, 0}));
+	ASSERT_TRUE(model.SetColour(0, {0, 0}, agi::Color(0, 255, 255, 0x10)));
+	EXPECT_EQ("{\\t(0,100,\\t(0,50,\\1c&HFFFF00&\\1a&H10&)\\bord2)\\vendor(raw)}text", model.Serialize());
+}
+
+TEST(ass_block_editor_model, invalid_colour_targets_leave_the_source_untouched) {
+	Model model;
+	std::string source = "{\\pos(1,2)\\vendor(raw)}text";
+	model.SetSource(source);
+	EXPECT_EQ(agi::Color(255, 255, 255, 0), model.GetColour(0));
+	EXPECT_FALSE(model.SetColour(0, {}, agi::Color(255, 0, 0)));
+	EXPECT_FALSE(model.SetColour(0, {1}, agi::Color(255, 0, 0)));
+	EXPECT_FALSE(model.SetColour(99, {}, agi::Color(255, 0, 0)));
+	EXPECT_EQ(source, model.Serialize());
+}
