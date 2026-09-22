@@ -10,6 +10,7 @@ aegisub_src = files(
     'ass_exporter.cpp',
     'ass_file.cpp',
     'ass_karaoke.cpp',
+    'ass_block_editor_model.cpp',
     'ass_override.cpp',
     'ass_override_ast.cpp',
     'ass_parser.cpp',
