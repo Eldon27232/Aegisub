@@ -116,6 +116,7 @@ class SubsEditBox final : public wxPanel {
 	bool laying_out_blocks = false;
 	wxPanel *block_panel;
 	std::unique_ptr<ass::blocks::Model> block_model;
+	wxTextCtrl *body_text_ctrl = nullptr;
 
 	wxSizer *top_sizer;
 	wxSizer *middle_right_sizer;
@@ -160,6 +161,8 @@ class SubsEditBox final : public wxPanel {
 	void OnChange(wxStyledTextEvent &event);
 	void OnKeyDown(wxKeyEvent &event);
 	void OnBlockNew(wxCommandEvent&);
+	void OnNewText(wxCommandEvent&);
+	void FocusTextBody();
 	void OnBlockContext(size_t row);
 	void SelectBlock(size_t row, bool control, bool shift);
 	void PaintBlockSelection();

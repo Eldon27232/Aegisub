@@ -292,10 +292,14 @@ SubsEditBox::SubsEditBox(wxWindow *parent, agi::Context *context)
 	new_block->SetToolTip(_("Search and add ASS features such as positioning, font, color, animation, and clipping"));
 	auto *templates = new wxButton(block_panel, wxID_ANY, _("Templates"));
 	templates->SetToolTip(_("Save, categorize, or apply global and project subtitle templates"));
+	auto *new_text = new wxButton(block_panel, wxID_ANY, _("New text"));
+	new_text->SetName("new-text-subtitle");
+	new_text->SetToolTip(_("Create a normal dialogue subtitle and start typing its text"));
 	show_ass_source = new wxCheckBox(block_panel, wxID_ANY, _("Show ASS source"));
 	show_ass_source->SetToolTip(_("Show and directly edit the complete ASS source below the block editor"));
 	block_header->Add(new_block, wxSizerFlags().Border(wxRIGHT));
 	block_header->Add(templates, wxSizerFlags().Border(wxRIGHT));
+	block_header->Add(new_text, wxSizerFlags().Border(wxRIGHT));
 	block_header->AddStretchSpacer();
 	block_header->Add(show_ass_source, wxSizerFlags().Center());
 	block_sizer->Add(block_header, wxSizerFlags().Expand().Border(wxBOTTOM, 3));
@@ -334,6 +338,7 @@ SubsEditBox::SubsEditBox(wxWindow *parent, agi::Context *context)
 	edit_ctrl->SetModEventMask(wxSTC_MOD_INSERTTEXT | wxSTC_MOD_DELETETEXT | wxSTC_STARTACTION);
 	new_block->Bind(wxEVT_BUTTON, &SubsEditBox::OnBlockNew, this);
 	templates->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { ShowAssTemplateManager(this, c); });
+	new_text->Bind(wxEVT_BUTTON, &SubsEditBox::OnNewText, this);
 	show_ass_source->Bind(wxEVT_CHECKBOX, &SubsEditBox::OnShowAssSource, this);
 
 	block_list->Bind(wxEVT_CHAR_HOOK, &SubsEditBox::OnBlockKeyDown, this);
@@ -628,6 +633,7 @@ void SubsEditBox::RefreshBlocks() {
 	auto generation = block_generation;
 	block_list->Freeze();
 	block_cards.clear();
+	body_text_ctrl = nullptr;
 	block_list->GetSizer()->Clear(true);
 	auto const& items = block_model->Items();
 	block_selection.erase(std::remove_if(block_selection.begin(), block_selection.end(),
@@ -785,6 +791,8 @@ void SubsEditBox::RefreshBlocks() {
 		else {
 			auto *text = new wxTextCtrl(card, wxID_ANY, to_wx(item.source), wxDefaultPosition, FromDIP(wxSize(340, -1)));
 			text->SetName(item.kind==ass::blocks::ItemKind::Raw?"block-raw-ass":"block-text"); field("",text);
+			if (item.kind == ass::blocks::ItemKind::Text && !body_text_ctrl)
+				body_text_ctrl = text;
 			if (item.kind == ass::blocks::ItemKind::Text)
 				text->Bind(wxEVT_TEXT,[text,save](wxCommandEvent&) {save(from_wx(text->GetValue()));});
 			else text->Bind(wxEVT_KILL_FOCUS,[text,save](wxFocusEvent& event) {event.Skip(); save(from_wx(text->GetValue()), true);});
@@ -812,6 +820,17 @@ void SubsEditBox::ApplyBlockChange(wxString const& desc, bool rebuild) {
 	if (line) { CommitText(desc); UpdateCharacterCount(source); }
 	changing_blocks = false;
 	if (rebuild) RefreshBlocks();
+}
+
+void SubsEditBox::FocusTextBody() {
+	if (!body_text_ctrl) return;
+	body_text_ctrl->SetFocus();
+	body_text_ctrl->SetInsertionPointEnd();
+}
+
+void SubsEditBox::OnNewText(wxCommandEvent&) {
+	cmd::call("grid/line/new/text", c);
+	CallAfter([this] { FocusTextBody(); });
 }
 
 void SubsEditBox::OnBlockNew(wxCommandEvent&) {

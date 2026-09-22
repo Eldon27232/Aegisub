@@ -7763,6 +7763,26 @@ msgstr "模板名称"
 msgid "Templates"
 msgstr "模板"
 
+#: ../src/subs_edit_box.cpp
+msgid "New text"
+msgstr "新建文本"
+
+#: ../src/subs_edit_box.cpp
+msgid "Create a normal dialogue subtitle and start typing its text"
+msgstr "创建普通文本字幕，并立即开始输入正文"
+
+#: ../src/command/grid.cpp
+msgid "New Text"
+msgstr "新建文本"
+
+#: ../src/command/grid.cpp
+msgid "Create a new text subtitle after the active line"
+msgstr "在当前行后创建一条新的文本字幕"
+
+#: ../src/command/grid.cpp
+msgid "new text subtitle"
+msgstr "新建文本字幕"
+
 #: ../src/visual_tool_screen_mask.cpp
 msgid "The color button uses the shared palette, eyedropper, recent colors, and frequently used project colors."
 msgstr "颜色按钮复用统一调色盘、吸色笔、最近颜色和项目常用颜色。"
