@@ -31,6 +31,7 @@
 #include "libresrc/libresrc.h"
 #include "options.h"
 #include "preferences_base.h"
+#include "theme.h"
 #include "video_provider_manager.h"
 
 #ifdef WITH_PORTAUDIO
@@ -263,10 +264,15 @@ void Interface(wxTreebook *book, Preferences *parent) {
 	auto visual_tools = p->PageSizer(_("Visual Tools"));
 	p->OptionAdd(visual_tools, _("Shape handle size"), "Tool/Visual/Shape Handle Size");
 
-#if defined(__WXMSW__) && wxVERSION_NUMBER >= 3300
-	auto dark_mode = p->PageSizer(_("Dark Mode"));
-	p->OptionAdd(dark_mode, _("Enable experimental dark mode (restart required)"), "App/Dark Mode");
-#endif
+	auto theme = p->PageSizer(_("Theme"));
+	const wxString themes_arr[] = {
+		"Dark+",
+		"Deep Gray",
+		"OLED Black",
+		"Light"
+	};
+	wxArrayString themes(4, themes_arr);
+	p->OptionChoice(theme, _("Interface theme (restart required)"), themes, "App/Theme");
 
 	p->SetSizerAndFit(p->sizer);
 }
@@ -803,6 +809,8 @@ Preferences::Preferences(wxWindow *parent): wxDialog(parent, -1, _("Preferences"
 	Bind(wxEVT_BUTTON, &Preferences::OnApply, this, wxID_APPLY);
 	Bind(wxEVT_BUTTON, std::bind(&HelpButton::OpenPage, "Options"), wxID_HELP);
 	defaultButton->Bind(wxEVT_BUTTON, &Preferences::OnResetDefault, this);
+
+	theme::Apply(this);
 }
 
 void ShowPreferences(wxWindow *parent) {

@@ -32,6 +32,7 @@
 #include "help_button.h"
 #include "libresrc/libresrc.h"
 #include "options.h"
+#include "theme.h"
 #include "persist_location.h"
 #include "utils.h"
 #include "value_event.h"
@@ -580,7 +581,7 @@ DialogColorPicker::DialogColorPicker(wxWindow *parent, agi::Color initial_color,
 		os_screen_dropper_button = new wxBitmapButton(this, wxID_ANY, eyedropper_bitmap, wxDefaultPosition, wxDefaultSize, wxBORDER_DEFAULT);
 	}
 	if (enable_screenshot_eyedropper) {
-		screenshot_screen_dropper_icon = new wxStaticBitmap(this, -1, eyedropper_bitmap, wxDefaultPosition, wxDefaultSize, (OPT_GET("App/Dark Mode")->GetBool() ? wxBORDER_SIMPLE : wxRAISED_BORDER));
+		screenshot_screen_dropper_icon = new wxStaticBitmap(this, -1, eyedropper_bitmap, wxDefaultPosition, wxDefaultSize, (theme::IsDark() ? wxBORDER_SIMPLE : wxRAISED_BORDER));
 		screenshot_screen_dropper = new ColorPickerScreenDropper(this, 7, 7, 8);
 	}
 
@@ -702,6 +703,7 @@ DialogColorPicker::DialogColorPicker(wxWindow *parent, agi::Color initial_color,
 	colorspace_choice->Bind(wxEVT_CHOICE, &DialogColorPicker::OnChangeMode, this);
 
 	button_sizer->GetHelpButton()->Bind(wxEVT_BUTTON, bind(&HelpButton::OpenPage, "Colour Picker"));
+	theme::Apply(this);
 }
 
 template<int N, class Control>

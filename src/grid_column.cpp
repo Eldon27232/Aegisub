@@ -21,6 +21,7 @@
 #include "compat.h"
 #include "include/aegisub/context.h"
 #include "options.h"
+#include "theme.h"
 #include "video_controller.h"
 #include "fold_controller.h"
 
@@ -383,7 +384,7 @@ public:
 			dc.SetBrush(wxBrush(blend(to_wx(bg_color->GetColor()), dc.GetBrush().GetColour(), alpha)));
 			dc.SetPen(*wxTRANSPARENT_PEN);
 			dc.DrawRectangle(x, y + 1, width, ext.GetHeight() + 3);
-			dc.SetTextForeground(blend(*wxBLACK, tc, alpha));
+			dc.SetTextForeground(blend(theme::IsDark() ? theme::GetPalette().grid_text : *wxBLACK, tc, alpha));
 		}
 
 		x += (width + 2 - ext.GetWidth()) / 2;

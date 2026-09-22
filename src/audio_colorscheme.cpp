@@ -32,6 +32,7 @@
 #include "audio_rendering_style.h"
 #include "colorspace.h"
 #include "options.h"
+#include "theme.h"
 
 #include <libaegisub/exception.h>
 #include <libaegisub/string.h>
@@ -40,6 +41,28 @@ AudioColorScheme::AudioColorScheme(int prec, std::string const& scheme_name, int
 : palette((3<<prec) + 3)
 , factor((size_t)1<<prec)
 {
+	if (theme::IsDark()) {
+		auto const& colors = theme::GetPalette();
+		wxColour target;
+		switch (static_cast<AudioRenderingStyle>(audio_rendering_style)) {
+			case AudioStyle_Normal: target = colors.audio_waveform; break;
+			case AudioStyle_Inactive: target = colors.audio_waveform_inactive; break;
+			case AudioStyle_Selected: target = colors.audio_selection; break;
+			case AudioStyle_Primary: target = colors.audio_primary; break;
+			default: throw agi::InternalError("Unknown audio rendering styling");
+		}
+
+		for (size_t i = 0; i <= factor; ++i) {
+			auto mix = [i, this](unsigned char from, unsigned char to) {
+				return static_cast<unsigned char>(from + (to - from) * i / factor);
+			};
+			palette[i * 3 + 0] = mix(colors.audio_background.Red(), target.Red());
+			palette[i * 3 + 1] = mix(colors.audio_background.Green(), target.Green());
+			palette[i * 3 + 2] = mix(colors.audio_background.Blue(), target.Blue());
+		}
+		return;
+	}
+
 	std::string opt_base = agi::Str("Colour/Schemes/", scheme_name, "/");
 	switch (static_cast<AudioRenderingStyle>(audio_rendering_style))
 	{

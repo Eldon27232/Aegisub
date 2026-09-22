@@ -52,6 +52,7 @@
 #include "project.h"
 #include "subs_controller.h"
 #include "subtitles_provider_libass.h"
+#include "theme.h"
 #include "utils.h"
 #include "value_event.h"
 #include "version.h"
@@ -214,8 +215,16 @@ bool AegisubApp::OnInit() {
 	}
 #endif
 
+	// Preserve the old experimental dark-mode preference while moving to
+	// named themes. New profiles keep the Light default from default_config.
+	if (OPT_GET("App/Dark Mode")->GetBool() && OPT_GET("App/Theme")->GetString() == "Light") {
+		OPT_SET("App/Theme")->SetString("Dark+");
+		OPT_SET("App/Dark Mode")->SetBool(false);
+	}
+	theme::Initialize();
+
 #if defined(__WXMSW__) && wxVERSION_NUMBER >= 3300
-	if (OPT_GET("App/Dark Mode")->GetBool()) {
+	if (theme::IsDark()) {
 		MSWEnableDarkMode(wxApp::DarkMode_Always);
 	}
 #endif

@@ -21,6 +21,7 @@
 
 #include "compat.h"
 #include "options.h"
+#include "theme.h"
 #include "utils.h"
 
 #include <libaegisub/dispatch.h>
@@ -109,7 +110,7 @@ public:
 };
 
 DialogProgress::DialogProgress(wxWindow *parent, wxString const& title_text, wxString const& message)
-: wxDialog(parent, -1, title_text, wxDefaultPosition, wxDefaultSize, (OPT_GET("App/Dark Mode")->GetBool() ? wxBORDER_SIMPLE : wxBORDER_RAISED))
+: wxDialog(parent, -1, title_text, wxDefaultPosition, wxDefaultSize, (theme::IsDark() ? wxBORDER_SIMPLE : wxBORDER_RAISED))
 , pulse_timer(GetEventHandler())
 {
 	title = new wxStaticText(this, -1, title_text, wxDefaultPosition, wxDefaultSize, wxALIGN_CENTRE | wxST_NO_AUTORESIZE);
@@ -135,6 +136,7 @@ DialogProgress::DialogProgress(wxWindow *parent, wxString const& title_text, wxS
 
 	SetSizerAndFit(sizer);
 	CenterOnParent();
+	theme::Apply(this);
 
 	Bind(wxEVT_SHOW, &DialogProgress::OnShow, this);
 	Bind(wxEVT_TIMER, [this](wxTimerEvent&) { gauge->Pulse(); });
