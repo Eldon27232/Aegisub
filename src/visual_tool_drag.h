@@ -32,6 +32,7 @@ public:
 
 class wxBitmapButton;
 class wxCommandEvent;
+class wxKeyEvent;
 class wxToolBar;
 
 /// @class VisualToolDrag
@@ -50,6 +51,10 @@ class VisualToolDrag final : public VisualTool<VisualToolDragDraggableFeature> {
 	/// When the button is pressed, will it convert the line to a move (vs. from
 	/// move to pos)? Used to avoid changing the button's icon unnecessarily
 	bool button_is_move = false;
+	bool segment_by_frame = false;
+	bool pending_segment_change = false;
+	int move_button_id = -1;
+	int segment_button_id = -1;
 
 	/// @brief Create the features for a line
 	/// @param diag Line to create the features for
@@ -66,8 +71,11 @@ class VisualToolDrag final : public VisualTool<VisualToolDragDraggableFeature> {
 
 	bool InitializeDrag(Feature *feature) override;
 	void UpdateDrag(Feature *feature) override;
+	void Commit(wxString message = wxString()) override;
 	void Draw() override;
 	void OnDoubleClick() override;
+	bool OnKeyDown(wxKeyEvent &event) override;
+	bool EnsureFrameSegment(Feature *feature);
 
 	/// Set the pos/move button to the correct icon based on the active line
 	void UpdateToggleButtons();

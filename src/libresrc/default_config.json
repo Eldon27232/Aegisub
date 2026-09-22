@@ -592,6 +592,7 @@
 			"Skip Whitespace" : true
 		},
 		"Visual" : {
+			"Frame Segments": false,
 			"Perspective": {
 				"Outer": false,
 				"Outer Locked": false,
