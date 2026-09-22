@@ -12,15 +12,19 @@
 #include <libaegisub/color.h>
 
 #include <vector>
+#include <memory>
+#include <functional>
 
 class wxCommandEvent;
 class wxToolBar;
+class wxMiniFrame;
+class wxChoice;
 
 class VisualToolScreenMask final : public VisualToolBase {
 public:
 	struct Settings {
 		ass::screen_mask::DurationMode duration = ass::screen_mask::DurationMode::CurrentFrame;
-		int frame_count = 2;
+		int frame_count = 1;
 		int until_frame = 0;
 		int custom_start_frame = 0;
 		int custom_end_frame = 0;
@@ -31,9 +35,13 @@ public:
 
 private:
 
-	enum class ShapeMode { Rectangle, Polygon };
+	enum class ShapeMode { Rectangle, Polygon, Select };
 
 	wxToolBar *toolbar = nullptr;
+	wxMiniFrame *panel = nullptr;
+	wxChoice *shape_choice = nullptr;
+	std::shared_ptr<int> panel_lifetime = std::make_shared<int>(0);
+	std::function<void()> sync_panel;
 	ShapeMode shape_mode = ShapeMode::Rectangle;
 	Settings settings;
 	int subtitle_end_frame = 0;
@@ -49,6 +57,8 @@ private:
 	void DoRefresh() override;
 	void OnTool(wxCommandEvent& event);
 	void OpenSettings();
+	void ApplySettings(bool timing);
+	void FinishPolygon();
 	void CreateMask(std::vector<ass::screen_mask::Point> const& new_points);
 	void UpdateMask();
 	int HitPoint(Vector2D display_point) const;
@@ -59,6 +69,7 @@ private:
 
 public:
 	VisualToolScreenMask(VideoDisplay *parent, agi::Context *context);
+	~VisualToolScreenMask() override;
 	void SetToolbar(wxToolBar *toolbar) override;
 	void SetSubTool(int subtool) override;
 	int GetSubTool() override;
