@@ -40,6 +40,7 @@ tests_src = [
     'tests/split.cpp',
     'tests/syntax_highlight.cpp',
     'tests/thesaurus.cpp',
+    'tests/theme.cpp',
     'tests/time.cpp',
     'tests/type_name.cpp',
     'tests/util.cpp',
@@ -49,7 +50,9 @@ tests_src = [
     'tests/ycbcr.cpp',
 ]
 
-tests_inc = include_directories('support')
+tests_src += files('../src/theme_palette.cpp')
+
+tests_inc = include_directories('support', '../src')
 
 tests_args = []
 
