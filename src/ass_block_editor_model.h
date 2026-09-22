@@ -61,8 +61,8 @@ public:
 	/// Parse GUI-owned structure around one opaque manual text span. Invalid
 	/// bounds fall back to treating the complete source as manual.
 	void SetSourceWithManualSpan(std::string source, size_t offset, size_t length);
-	/// Restore source plus persisted ownership. Missing, stale or malformed
-	/// metadata is deliberately treated as one opaque manual text item.
+	/// Restore source plus persisted ownership. Without metadata, take over
+	/// recognized ASS tags; stale or malformed metadata stays opaque/manual.
 	void SetStoredSource(std::string source, std::string_view origin_metadata);
 	std::string Serialize() const;
 	/// Versioned, source-bound ownership runs suitable for Extradata.

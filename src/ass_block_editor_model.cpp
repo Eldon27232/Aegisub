@@ -254,7 +254,15 @@ void Model::SetSource(std::string source) {
 
 void Model::SetSourceWithManualSpan(std::string source, size_t offset, size_t length) {
 	if (offset > source.size() || length > source.size() - offset) {
-		SetStoredSource(std::move(source), {});
+		original_ = std::move(source);
+		parts_.clear();
+		Part manual;
+		manual.kind = PartKind::Text;
+		manual.origin = Origin::Manual;
+		manual.original = original_;
+		parts_.push_back(std::move(manual));
+		dirty_ = false;
+		RebuildItems();
 		return;
 	}
 
@@ -285,6 +293,10 @@ void Model::SetSourceWithManualSpan(std::string source, size_t offset, size_t le
 }
 
 void Model::SetStoredSource(std::string source, std::string_view origin_metadata) {
+	if (origin_metadata.empty()) {
+		SetSource(std::move(source));
+		return;
+	}
 	original_ = std::move(source);
 	parts_.clear();
 	auto append_opaque = [this](std::string_view text, Origin origin) {
