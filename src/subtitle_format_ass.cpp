@@ -130,6 +130,7 @@ struct Writer {
 		WriteIfNotEmpty("Video File: ", properties.video_file);
 		WriteIfNotEmpty("Timecodes File: ", properties.timecodes_file);
 		WriteIfNotEmpty("Keyframes File: ", properties.keyframes_file);
+		WriteIfNotEmpty("Localization Templates: ", properties.localization_templates);
 		for (auto const& [key, value] : properties.automation_settings)
 			WriteIfNotEmpty(("Automation Settings " + key + ": ").c_str(), value);
 
@@ -192,6 +193,7 @@ std::optional<ProjectPropertyState> get_project_property(ProjectProperties const
 	if (key == "Video File") return string_property("video_file", properties.video_file);
 	if (key == "Timecodes File") return string_property("timecodes_file", properties.timecodes_file);
 	if (key == "Keyframes File") return string_property("keyframes_file", properties.keyframes_file);
+	if (key == "Localization Templates") return string_property("localization_templates", properties.localization_templates);
 	if (key == "Video Zoom Percent" || key == "Aegisub Video Zoom Percent") return double_property("video_zoom", properties.video_zoom);
 	if (key == "Scroll Position" || key == "Aegisub Scroll Position") return int_property("scroll_position", properties.scroll_position);
 	if (key == "Active Line" || key == "Aegisub Active Line") return int_property("active_row", properties.active_row);
@@ -318,6 +320,7 @@ class PassthroughWriter {
 		AppendProjectProperty("Video File");
 		AppendProjectProperty("Timecodes File");
 		AppendProjectProperty("Keyframes File");
+		AppendProjectProperty("Localization Templates");
 		for (auto const& setting : src.Properties.automation_settings)
 			AppendProjectProperty("Automation Settings " + setting.first);
 		AppendProjectProperty("Video AR Mode");
@@ -375,6 +378,7 @@ class PassthroughWriter {
 				|| !src.Properties.export_encoding.empty() || !src.Properties.style_storage.empty()
 				|| !src.Properties.audio_file.empty() || !src.Properties.video_file.empty()
 				|| !src.Properties.timecodes_file.empty() || !src.Properties.keyframes_file.empty()
+				|| !src.Properties.localization_templates.empty()
 				|| !src.Properties.automation_settings.empty() || src.Properties.ar_mode != 0 || src.Properties.ar_value != 0.
 				|| src.Properties.video_zoom != 0. || src.Properties.scroll_position != 0 || src.Properties.active_row != 0
 				|| src.Properties.video_position != 0;

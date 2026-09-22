@@ -41,6 +41,7 @@
 #include "command/command.h"
 #include "compat.h"
 #include "dialog_style_editor.h"
+#include "dialog_ass_templates.h"
 #include "flyweight_hash.h"
 #include "include/aegisub/context.h"
 #include "include/aegisub/hotkey.h"
@@ -267,9 +268,12 @@ SubsEditBox::SubsEditBox(wxWindow *parent, agi::Context *context)
 	auto *block_header = new wxBoxSizer(wxHORIZONTAL);
 	auto *new_block = new wxButton(block_panel, wxID_ANY, _("新建"));
 	new_block->SetToolTip(_("搜索并添加定位、字体、颜色、动画、裁剪等 ASS 功能"));
+	auto *templates = new wxButton(block_panel, wxID_ANY, _("模板"));
+	templates->SetToolTip(_("保存、分类或套用全局和项目字幕模板"));
 	show_ass_source = new wxCheckBox(block_panel, wxID_ANY, _("显示 ASS 源码"));
 	show_ass_source->SetToolTip(_("在方块编辑器下方显示并直接编辑完整 ASS 源码"));
 	block_header->Add(new_block, wxSizerFlags().Border(wxRIGHT));
+	block_header->Add(templates, wxSizerFlags().Border(wxRIGHT));
 	block_header->AddStretchSpacer();
 	block_header->Add(show_ass_source, wxSizerFlags().Center());
 	block_sizer->Add(block_header, wxSizerFlags().Expand().Border(wxBOTTOM, 3));
@@ -307,6 +311,7 @@ SubsEditBox::SubsEditBox(wxWindow *parent, agi::Context *context)
 	edit_ctrl->Bind(wxEVT_STC_MODIFIED, &SubsEditBox::OnChange, this);
 	edit_ctrl->SetModEventMask(wxSTC_MOD_INSERTTEXT | wxSTC_MOD_DELETETEXT | wxSTC_STARTACTION);
 	new_block->Bind(wxEVT_BUTTON, &SubsEditBox::OnBlockNew, this);
+	templates->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { ShowAssTemplateManager(this, c); });
 	show_ass_source->Bind(wxEVT_CHECKBOX, &SubsEditBox::OnShowAssSource, this);
 	block_list->Bind(wxEVT_LIST_ITEM_ACTIVATED, &SubsEditBox::OnBlockActivate, this);
 	block_list->Bind(wxEVT_LIST_ITEM_RIGHT_CLICK, &SubsEditBox::OnBlockContext, this);

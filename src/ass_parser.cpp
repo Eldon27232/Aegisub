@@ -56,6 +56,7 @@ public:
 		{"Video File", &ProjectProperties::video_file},
 		{"Timecodes File", &ProjectProperties::timecodes_file},
 		{"Keyframes File", &ProjectProperties::keyframes_file},
+		{"Localization Templates", &ProjectProperties::localization_templates},
 		{"Video Zoom Percent", &ProjectProperties::video_zoom},
 		{"Scroll Position", &ProjectProperties::scroll_position},
 		{"Active Line", &ProjectProperties::active_row},
