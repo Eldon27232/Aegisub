@@ -38,6 +38,7 @@
 #include "options.h"
 #include "project.h"
 #include "selection_controller.h"
+#include "theme.h"
 #include "video_controller.h"
 #include "video_display.h"
 #include "video_slider.h"
@@ -118,12 +119,12 @@ void VideoBox::UpdateTimeBoxes() {
 	VideoPosition->SetValue(fmt_wx("%s - %d", agi::Time(time).GetAssFormatted(true), frame));
 	if (boost::binary_search(context->project->Keyframes(), frame)) {
 		// Set the background color to indicate this is a keyframe
-		VideoPosition->SetBackgroundColour(to_wx(OPT_GET("Colour/Subtitle Grid/Background/Selection")->GetColor()));
-		VideoPosition->SetForegroundColour(to_wx(OPT_GET("Colour/Subtitle Grid/Selection")->GetColor()));
+		VideoPosition->SetBackgroundColour(theme::IsDark() ? theme::GetPalette().selection : to_wx(OPT_GET("Colour/Subtitle Grid/Background/Selection")->GetColor()));
+		VideoPosition->SetForegroundColour(theme::IsDark() ? theme::GetPalette().selection_text : to_wx(OPT_GET("Colour/Subtitle Grid/Selection")->GetColor()));
 	}
 	else {
-		VideoPosition->SetBackgroundColour(wxNullColour);
-		VideoPosition->SetForegroundColour(wxNullColour);
+		VideoPosition->SetBackgroundColour(theme::IsDark() ? theme::GetPalette().control_background : wxNullColour);
+		VideoPosition->SetForegroundColour(theme::IsDark() ? theme::GetPalette().text : wxNullColour);
 	}
 
 	AssDialogue *active_line = context->selectionController->GetActiveLine();

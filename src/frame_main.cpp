@@ -53,6 +53,7 @@
 #include "project.h"
 #include "subs_controller.h"
 #include "subs_edit_box.h"
+#include "theme.h"
 #include "utils.h"
 #include "version.h"
 #include "video_box.h"
@@ -154,6 +155,9 @@ FrameMain::FrameMain()
 	StartupLog("Load default file");
 	context->project->CloseSubtitles();
 
+	StartupLog("Apply interface theme");
+	theme::Apply(this);
+
 	StartupLog("Display main window");
 	AddFullScreenButton(this);
 	Show();
@@ -254,7 +258,7 @@ void FrameMain::UpdateTitle() {
 	newTitle << context->subsController->Filename().filename().wstring();
 
 #ifndef __WXMAC__
-	newTitle << " - Aegisub " << GetAegisubLongVersionString();
+	newTitle << " - Aegisub Localization Edition " << GetAegisubLongVersionString();
 #endif
 
 #if defined(__WXMAC__)

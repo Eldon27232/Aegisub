@@ -38,6 +38,7 @@
 #include "include/aegisub/spellchecker.h"
 #include "selection_controller.h"
 #include "text_selection_controller.h"
+#include "theme.h"
 #include "thesaurus.h"
 #include "utils.h"
 
@@ -227,9 +228,25 @@ void SubsTextEditCtrl::OnKeyDown(wxKeyEvent &event) {
 void SubsTextEditCtrl::SetSyntaxStyle(int id, wxFont &font, std::string const& name, wxColor const& default_background) {
 	StyleSetFont(id, font);
 	StyleSetBold(id, OPT_GET("Colour/Subtitle/Syntax/Bold/" + name)->GetBool());
-	StyleSetForeground(id, to_wx(OPT_GET("Colour/Subtitle/Syntax/" + name)->GetColor()));
+	auto foreground = to_wx(OPT_GET("Colour/Subtitle/Syntax/" + name)->GetColor());
+	if (theme::IsDark()) {
+		auto const& palette = theme::GetPalette();
+		if (name == "Comment" || name == "Brackets" || name == "Slashes")
+			foreground = palette.muted_text;
+		else if (name == "Error")
+			foreground = palette.grid_collision_text;
+		else if (name == "Tags" || name == "Drawing Command" || name == "Karaoke Template")
+			foreground = palette.accent;
+		else if (name == "Parameters" || name == "Drawing X" || name == "Drawing Y" || name == "Karaoke Variable")
+			foreground = palette.audio_waveform;
+		else
+			foreground = palette.text;
+	}
+	StyleSetForeground(id, foreground);
 	const agi::OptionValue *background = OPT_GET("Colour/Subtitle/Syntax/Background/" + name);
-	if (background->GetType() == agi::OptionType::Color)
+	if (theme::IsDark() && name == "Error")
+		StyleSetBackground(id, theme::GetPalette().error_background);
+	else if (background->GetType() == agi::OptionType::Color)
 		StyleSetBackground(id, to_wx(background->GetColor()));
 	else
 		StyleSetBackground(id, default_background);
@@ -242,7 +259,9 @@ void SubsTextEditCtrl::SetStyles() {
 	if (!fontname.empty()) font.SetFaceName(fontname);
 	font.SetPointSize(OPT_GET("Subtitle/Edit Box/Font Size")->GetInt());
 
-	auto default_background = to_wx(OPT_GET("Colour/Subtitle/Background")->GetColor());
+	auto default_background = theme::IsDark()
+		? theme::GetPalette().control_background
+		: to_wx(OPT_GET("Colour/Subtitle/Background")->GetColor());
 
 	namespace ss = agi::ass::SyntaxStyle;
 	SetSyntaxStyle(ss::NORMAL, font, "Normal", default_background);

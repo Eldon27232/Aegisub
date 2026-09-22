@@ -29,6 +29,7 @@
 #include "options.h"
 #include "project.h"
 #include "selection_controller.h"
+#include "theme.h"
 #include "utils.h"
 
 #include <libaegisub/ass/karaoke.h>
@@ -161,7 +162,7 @@ void AudioKaraoke::OnPaint(wxPaintEvent &) {
 	dc.SetPen(*wxTRANSPARENT_PEN);
 
 	int width_past_bmp = w + scroll_x - rendered_line.GetWidth();
-	dc.SetBrush(*wxWHITE_BRUSH);
+	dc.SetBrush(wxBrush(theme::IsDark() ? theme::GetPalette().control_background : *wxWHITE));
 	if (width_past_bmp > 0)
 		dc.DrawRectangle(w - width_past_bmp, 0, width_past_bmp, h);
 
@@ -174,12 +175,12 @@ void AudioKaraoke::OnPaint(wxPaintEvent &) {
 			wxPoint(4, h / 2),
 			wxPoint(10, h / 2 + 6)
 		};
-		dc.SetBrush(*wxBLACK_BRUSH);
+		dc.SetBrush(wxBrush(theme::IsDark() ? theme::GetPalette().text : *wxBLACK));
 		dc.DrawPolygon(3, triangle);
 	}
 
 	if (rendered_line.GetWidth() - scroll_x > w) {
-		dc.SetBrush(*wxWHITE_BRUSH);
+		dc.SetBrush(wxBrush(theme::IsDark() ? theme::GetPalette().control_background : *wxWHITE));
 		dc.DrawRectangle(w - 20, 0, 20, h);
 
 		wxPoint triangle[] = {
@@ -187,7 +188,7 @@ void AudioKaraoke::OnPaint(wxPaintEvent &) {
 			wxPoint(w - 4, h / 2),
 			wxPoint(w - 10, h / 2 + 6)
 		};
-		dc.SetBrush(*wxBLACK_BRUSH);
+		dc.SetBrush(wxBrush(theme::IsDark() ? theme::GetPalette().text : *wxBLACK));
 		dc.DrawPolygon(3, triangle);
 	}
 }
@@ -204,12 +205,12 @@ void AudioKaraoke::RenderText() {
 	wxMemoryDC dc(rendered_line);
 
 	// Draw background
-	dc.SetBrush(wxBrush(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW)));
+	dc.SetBrush(wxBrush(theme::IsDark() ? theme::GetPalette().control_background : wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW)));
 	dc.SetPen(*wxTRANSPARENT_PEN);
 	dc.DrawRectangle(wxPoint(), bmp_size);
 
 	dc.SetFont(split_font);
-	dc.SetTextForeground(wxColour(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT)));
+	dc.SetTextForeground(theme::IsDark() ? theme::GetPalette().text : wxColour(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWTEXT)));
 
 	// Draw each character in the line
 	int y = (bmp_size.GetHeight() - char_height) / 2;

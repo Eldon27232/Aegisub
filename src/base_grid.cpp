@@ -40,6 +40,7 @@
 #include "fold_controller.h"
 #include "grid_column.h"
 #include "options.h"
+#include "theme.h"
 #include "project.h"
 #include "utils.h"
 #include "selection_controller.h"
@@ -62,7 +63,7 @@ enum {
 };
 
 BaseGrid::BaseGrid(wxWindow* parent, agi::Context *context)
-: wxWindow(parent, -1, wxDefaultPosition, wxDefaultSize, wxWANTS_CHARS | (OPT_GET("App/Dark Mode")->GetBool() ? wxBORDER_SIMPLE : wxSUNKEN_BORDER))
+: wxWindow(parent, -1, wxDefaultPosition, wxDefaultSize, wxWANTS_CHARS | (theme::IsDark() ? wxBORDER_SIMPLE : wxSUNKEN_BORDER))
 , scrollBar(new wxScrollBar(this, GRID_SCROLLBAR, wxDefaultPosition, wxDefaultSize, wxSB_VERTICAL))
 , context(context)
 , columns(GetGridColumns())
@@ -186,16 +187,31 @@ void BaseGrid::UpdateStyle() {
 	// Set line height
 	lineHeight = dc.GetCharHeight() + 4;
 
-	// Set row brushes
-	row_colors.Default.SetColour(to_wx(OPT_GET("Colour/Subtitle Grid/Background/Background")->GetColor()));
-	row_colors.Header.SetColour(to_wx(OPT_GET("Colour/Subtitle Grid/Header")->GetColor()));
-	row_colors.Selection.SetColour(to_wx(OPT_GET("Colour/Subtitle Grid/Background/Selection")->GetColor()));
-	row_colors.Comment.SetColour(to_wx(OPT_GET("Colour/Subtitle Grid/Background/Comment")->GetColor()));
-	row_colors.Visible.SetColour(to_wx(OPT_GET("Colour/Subtitle Grid/Background/Inframe")->GetColor()));
-	row_colors.SelectedComment.SetColour(to_wx(OPT_GET("Colour/Subtitle Grid/Background/Selected Comment")->GetColor()));
-	row_colors.FoldOpen.SetColour(to_wx(OPT_GET("Colour/Subtitle Grid/Background/Open Fold")->GetColor()));
-	row_colors.FoldClosed.SetColour(to_wx(OPT_GET("Colour/Subtitle Grid/Background/Closed Fold")->GetColor()));
-	row_colors.LeftCol.SetColour(to_wx(OPT_GET("Colour/Subtitle Grid/Left Column")->GetColor()));
+	// Set row brushes. Named dark themes use one central palette so the grid,
+	// edit area, audio view and future localization panels stay coherent.
+	if (theme::IsDark()) {
+		auto const& palette = theme::GetPalette();
+		row_colors.Default.SetColour(palette.grid_background);
+		row_colors.Header.SetColour(palette.grid_header);
+		row_colors.Selection.SetColour(palette.selection);
+		row_colors.Comment.SetColour(palette.grid_comment);
+		row_colors.Visible.SetColour(palette.grid_in_frame);
+		row_colors.SelectedComment.SetColour(palette.grid_selected_comment);
+		row_colors.FoldOpen.SetColour(palette.grid_fold_open);
+		row_colors.FoldClosed.SetColour(palette.grid_fold_closed);
+		row_colors.LeftCol.SetColour(palette.grid_left_column);
+	}
+	else {
+		row_colors.Default.SetColour(to_wx(OPT_GET("Colour/Subtitle Grid/Background/Background")->GetColor()));
+		row_colors.Header.SetColour(to_wx(OPT_GET("Colour/Subtitle Grid/Header")->GetColor()));
+		row_colors.Selection.SetColour(to_wx(OPT_GET("Colour/Subtitle Grid/Background/Selection")->GetColor()));
+		row_colors.Comment.SetColour(to_wx(OPT_GET("Colour/Subtitle Grid/Background/Comment")->GetColor()));
+		row_colors.Visible.SetColour(to_wx(OPT_GET("Colour/Subtitle Grid/Background/Inframe")->GetColor()));
+		row_colors.SelectedComment.SetColour(to_wx(OPT_GET("Colour/Subtitle Grid/Background/Selected Comment")->GetColor()));
+		row_colors.FoldOpen.SetColour(to_wx(OPT_GET("Colour/Subtitle Grid/Background/Open Fold")->GetColor()));
+		row_colors.FoldClosed.SetColour(to_wx(OPT_GET("Colour/Subtitle Grid/Background/Closed Fold")->GetColor()));
+		row_colors.LeftCol.SetColour(to_wx(OPT_GET("Colour/Subtitle Grid/Left Column")->GetColor()));
+	}
 
 	if (width_helper)
 		width_helper->ClearCache();
@@ -321,12 +337,13 @@ void BaseGrid::OnPaint(wxPaintEvent &) {
 	dc.DrawRectangle(0, lineHeight, columns[0]->Width(), h-lineHeight);
 
 	// Row colors
-	wxColour text_standard(to_wx(OPT_GET("Colour/Subtitle Grid/Standard")->GetColor()));
-	wxColour text_selection(to_wx(OPT_GET("Colour/Subtitle Grid/Selection")->GetColor()));
-	wxColour text_collision(to_wx(OPT_GET("Colour/Subtitle Grid/Collision")->GetColor()));
+	auto const& palette = theme::GetPalette();
+	wxColour text_standard = theme::IsDark() ? palette.grid_text : to_wx(OPT_GET("Colour/Subtitle Grid/Standard")->GetColor());
+	wxColour text_selection = theme::IsDark() ? palette.grid_selected_text : to_wx(OPT_GET("Colour/Subtitle Grid/Selection")->GetColor());
+	wxColour text_collision = theme::IsDark() ? palette.grid_collision_text : to_wx(OPT_GET("Colour/Subtitle Grid/Collision")->GetColor());
 
 	// First grid row
-	wxPen grid_pen(to_wx(OPT_GET("Colour/Subtitle Grid/Lines")->GetColor()));
+	wxPen grid_pen(theme::IsDark() ? palette.grid_lines : to_wx(OPT_GET("Colour/Subtitle Grid/Lines")->GetColor()));
 	dc.SetPen(grid_pen);
 	dc.DrawLine(0, 0, w, 0);
 	dc.SetPen(*wxTRANSPARENT_PEN);
@@ -434,7 +451,7 @@ void BaseGrid::OnPaint(wxPaintEvent &) {
 	}
 
 	if (active_line && active_line->Fold.getVisibleRow() >= yPos && active_line->Fold.getVisibleRow() < yPos + nDraw) {
-		dc.SetPen(wxPen(to_wx(OPT_GET("Colour/Subtitle Grid/Active Border")->GetColor())));
+		dc.SetPen(wxPen(theme::IsDark() ? palette.grid_active_border : to_wx(OPT_GET("Colour/Subtitle Grid/Active Border")->GetColor())));
 		dc.SetBrush(*wxTRANSPARENT_BRUSH);
 		dc.DrawRectangle(0, (active_line->Fold.getVisibleRow() - yPos + 1) * lineHeight, w, lineHeight + 1);
 	}

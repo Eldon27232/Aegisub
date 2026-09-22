@@ -41,6 +41,7 @@
 #include "include/aegisub/hotkey.h"
 #include "options.h"
 #include "project.h"
+#include "theme.h"
 #include "utils.h"
 #include "video_controller.h"
 
@@ -106,6 +107,17 @@ public:
 	/// @param name Name of the colour scheme
 	void SetColourScheme(std::string const& name)
 	{
+		if (theme::IsDark()) {
+			auto const& palette = theme::GetPalette();
+			light_colour = palette.border;
+			dark_colour = palette.audio_background;
+			sel_colour = palette.audio_selection;
+			light_focused_colour = palette.accent;
+			dark_focused_colour = palette.audio_background;
+			sel_focused_colour = palette.selection;
+			return;
+		}
+
 		std::string opt_prefix = "Colour/Schemes/" + name + "/UI/";
 		light_colour = to_wx(OPT_GET(opt_prefix + "Light")->GetColor());
 		dark_colour = to_wx(OPT_GET(opt_prefix + "Dark")->GetColor());
@@ -942,7 +954,7 @@ void AudioDisplay::PaintLabels(wxDC &dc, TimeRange updtime)
 	wxFont font = dc.GetFont();
 	font.SetWeight(wxFONTWEIGHT_BOLD);
 	fc.Set(font);
-	dc.SetTextForeground(*wxWHITE);
+	dc.SetTextForeground(theme::IsDark() ? theme::GetPalette().text : *wxWHITE);
 	for (auto const& label : labels)
 	{
 		wxSize extent = dc.GetTextExtent(label.text);
@@ -965,7 +977,7 @@ void AudioDisplay::PaintLabels(wxDC &dc, TimeRange updtime)
 }
 
 void AudioDisplay::PaintTrackCursor(wxDC &dc) {
-	wxDCPenChanger penchanger(dc, wxPen(*wxWHITE));
+	wxDCPenChanger penchanger(dc, wxPen(theme::IsDark() ? theme::GetPalette().audio_cursor : *wxWHITE));
 	dc.DrawLine(track_cursor_pos-scroll_left, audio_top, track_cursor_pos-scroll_left, audio_top+audio_height);
 
 	if (track_cursor_label.empty()) return;
@@ -986,14 +998,14 @@ void AudioDisplay::PaintTrackCursor(wxDC &dc) {
 	dc.SetBackgroundMode(wxTRANSPARENT);
 
 	// Draw border
-	dc.SetTextForeground(wxColour(64, 64, 64));
+	dc.SetTextForeground(theme::IsDark() ? theme::GetPalette().slider_border : wxColour(64, 64, 64));
 	dc.DrawText(track_cursor_label, label_pos.x+1, label_pos.y+1);
 	dc.DrawText(track_cursor_label, label_pos.x+1, label_pos.y-1);
 	dc.DrawText(track_cursor_label, label_pos.x-1, label_pos.y+1);
 	dc.DrawText(track_cursor_label, label_pos.x-1, label_pos.y-1);
 
 	// Draw fill
-	dc.SetTextForeground(*wxWHITE);
+	dc.SetTextForeground(theme::IsDark() ? theme::GetPalette().text : *wxWHITE);
 	dc.DrawText(track_cursor_label, label_pos.x, label_pos.y);
 	dc.SetBackgroundMode(old_bg_mode);
 

@@ -24,6 +24,7 @@
 #include "include/aegisub/context.h"
 #include "options.h"
 #include "selection_controller.h"
+#include "theme.h"
 #include "video_controller.h"
 #include "video_display.h"
 #include "visual_tool_clip.h"
@@ -290,11 +291,12 @@ void VisualTool<FeatureType>::OnMouseEvent(wxMouseEvent &event) {
 
 template<class FeatureType>
 void VisualTool<FeatureType>::DrawAllFeatures() {
-	wxColour grid_color = to_wx(line_color_secondary_opt->GetColor());
+	auto const& palette = theme::GetPalette();
+	wxColour grid_color = theme::IsDark() ? palette.border : to_wx(line_color_secondary_opt->GetColor());
 	gl.SetLineColour(grid_color, 1.0f, 1);
-	wxColour base_fill = to_wx(highlight_color_primary_opt->GetColor());
-	wxColour active_fill = to_wx(highlight_color_secondary_opt->GetColor());
-	wxColour alt_fill = to_wx(line_color_primary_opt->GetColor());
+	wxColour base_fill = theme::IsDark() ? palette.accent : to_wx(highlight_color_primary_opt->GetColor());
+	wxColour active_fill = theme::IsDark() ? palette.selection : to_wx(highlight_color_secondary_opt->GetColor());
+	wxColour alt_fill = theme::IsDark() ? palette.audio_primary : to_wx(line_color_primary_opt->GetColor());
 	for (auto& feature : features) {
 		wxColour fill = base_fill;
 		if (&feature == active_feature)

@@ -41,6 +41,7 @@
 #include "include/aegisub/hotkey.h"
 #include "options.h"
 #include "project.h"
+#include "theme.h"
 #include "utils.h"
 #include "video_controller.h"
 
@@ -184,12 +185,13 @@ void VideoSlider::OnPaint(wxPaintEvent &) {
 	GetClientSize(&w, &h);
 
 	// Colors
-	wxColour shad = wxSystemSettings::GetColour(wxSYS_COLOUR_3DDKSHADOW);
-	wxColour high = wxSystemSettings::GetColour(wxSYS_COLOUR_3DLIGHT);
-	wxColour face = wxSystemSettings::GetColour(wxSYS_COLOUR_3DFACE);
-	wxColour sel(123,251,232);
+	auto const& palette = theme::GetPalette();
+	wxColour shad = theme::IsDark() ? palette.border : wxSystemSettings::GetColour(wxSYS_COLOUR_3DDKSHADOW);
+	wxColour high = theme::IsDark() ? palette.muted_text : wxSystemSettings::GetColour(wxSYS_COLOUR_3DLIGHT);
+	wxColour face = theme::IsDark() ? palette.window_background : wxSystemSettings::GetColour(wxSYS_COLOUR_3DFACE);
+	wxColour sel = theme::IsDark() ? palette.slider_selection : wxColour(123,251,232);
 	wxColour notSel(sel.Red()*2/5,sel.Green()*2/5,sel.Blue()*2/5);
-	wxColour bord(0,0,0);
+	wxColour bord = theme::IsDark() ? palette.slider_border : wxColour(0,0,0);
 	int x1,x2,y1,y2;
 
 	// Background

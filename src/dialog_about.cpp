@@ -29,6 +29,7 @@
 
 #include "libresrc/libresrc.h"
 #include "format.h"
+#include "theme.h"
 #include "version.h"
 
 #include <wx/button.h>
@@ -41,14 +42,14 @@
 #include <wx/textctrl.h>
 
 void ShowAboutDialog(wxWindow *parent) {
-	wxDialog d(parent, -1, _("About Aegisub"), wxDefaultPosition, wxDefaultSize, wxCAPTION | wxCLOSE_BOX);
+	wxDialog d(parent, -1, _("About Aegisub Localization Edition"), wxDefaultPosition, wxDefaultSize, wxCAPTION | wxCLOSE_BOX);
 
 	wxString translatorCredit = _("Translated into LANGUAGE by PERSON\n");
 	if (translatorCredit == "Translated into LANGUAGE by PERSON\n")
 		translatorCredit.clear();
 
 	// Generate about string
-	wxString aboutString = wxString("Aegisub ") + GetAegisubShortVersionString() + ".\n"
+	wxString aboutString = wxString("Aegisub Localization Edition ") + GetAegisubShortVersionString() + ".\n"
 		"Copyright (c) 2005-2026 Rodrigo Braz Monteiro, Niels Martin Hansen, Thomas Goyne et al.\n\n"
 		"Programmers:\n"
 		"    Alysson Souza e Silva\n"
@@ -149,5 +150,6 @@ void ShowAboutDialog(wxWindow *parent) {
 
 	d.SetSizerAndFit(MainSizer);
 	d.CentreOnParent();
+	theme::Apply(&d);
 	d.ShowModal();
 }
