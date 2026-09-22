@@ -27,6 +27,7 @@
 #include "../visual_tool_rotatexy.h"
 #include "../visual_tool_rotatez.h"
 #include "../visual_tool_scale.h"
+#include "../visual_tool_screen_mask.h"
 #include "../visual_tool_vector_clip.h"
 
 
@@ -157,6 +158,14 @@ namespace {
 		STR_MENU("Vector Clip")
 		STR_DISP("Vector Clip")
 		STR_HELP("Clip subtitles to a vectorial area")
+	};
+
+	struct visual_mode_screen_mask final : public visual_tool_command<VisualToolScreenMask> {
+		CMD_NAME("video/tool/screen_mask")
+		CMD_ICON(visual_clip)
+		STR_MENU("快速画面遮罩")
+		STR_DISP("快速画面遮罩")
+		STR_HELP("直接在视频画面上绘制标准 ASS Drawing 遮罩")
 	};
 
 	// Perspective settings
@@ -337,6 +346,7 @@ namespace cmd {
 		reg(std::make_unique<visual_mode_scale>());
 		reg(std::make_unique<visual_mode_clip>());
 		reg(std::make_unique<visual_mode_vector_clip>());
+		reg(std::make_unique<visual_mode_screen_mask>());
 
 		reg(std::make_unique<visual_mode_vclip_drag>());
 		reg(std::make_unique<visual_mode_vclip_line>());

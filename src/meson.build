@@ -112,6 +112,7 @@ aegisub_src = files(
     'preferences_base.cpp',
     'project.cpp',
     'resolution_resampler.cpp',
+    'screen_mask_model.cpp',
     'search_replace_engine.cpp',
     'selection_controller.cpp',
     'spellchecker.cpp',
@@ -167,6 +168,7 @@ aegisub_src = files(
     'visual_tool_rotatexy.cpp',
     'visual_tool_rotatez.cpp',
     'visual_tool_scale.cpp',
+    'visual_tool_screen_mask.cpp',
     'visual_tool_vector_clip.cpp',
 )
 
