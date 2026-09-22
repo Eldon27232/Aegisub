@@ -74,9 +74,95 @@ void FoldController::InvalidateLineFold(AssDialogue &line) {
 
 void FoldController::AddFold(AssDialogue& start, AssDialogue& end, bool collapsed) {
 	if (CanAddFold(start, end)) {
-		RawAddFold(start, end, true);
+		RawAddFold(start, end, collapsed);
 		context->ass->Commit(_("add fold"), AssFile::COMMIT_FOLD);
 	}
+}
+
+void FoldController::AddAutomaticFold(AssDialogue& start, AssDialogue& end, bool collapsed) {
+	RawAddFold(start, end, collapsed);
+}
+
+std::vector<AssDialogue *> FoldController::GetFoldLines(AssDialogue& line) const {
+	AssDialogue *opener = nullptr;
+	if (line.Fold.valid && !line.Fold.side)
+		opener = &line;
+	else if (line.Fold.parent)
+		opener = line.Fold.parent;
+	else if (line.Fold.valid && line.Fold.side)
+		opener = line.Fold.counterpart;
+
+	if (!opener || !opener->Fold.counterpart)
+		return {&line};
+
+	std::vector<AssDialogue *> result;
+	auto end = opener->Fold.counterpart;
+	for (auto it = context->ass->iterator_to(*opener); it != context->ass->Events.end(); ++it) {
+		result.push_back(&*it);
+		if (&*it == end) break;
+	}
+	return result;
+}
+
+void FoldController::MergeIntoFlatGroup(std::vector<AssDialogue *> const& lines) {
+	if (lines.size() < 2) return;
+
+	int first = context->ass->Events.size();
+	int last = -1;
+	for (auto *line : lines) {
+		if (!line) continue;
+		auto group = GetFoldLines(*line);
+		first = std::min(first, group.front()->Row);
+		last = std::max(last, group.back()->Row);
+	}
+	if (first < 0 || last <= first) return;
+
+	// Include any group crossed by the selected range, then remove all old
+	// delimiters in the final range so the result stays flat rather than nested.
+	bool expanded;
+	do {
+		expanded = false;
+		for (auto& line : context->ass->Events) {
+			if (line.Row < first || line.Row > last) continue;
+			auto group = GetFoldLines(line);
+			int next_first = std::min(first, group.front()->Row);
+			int next_last = std::max(last, group.back()->Row);
+			expanded |= next_first != first || next_last != last;
+			first = next_first;
+			last = next_last;
+		}
+	} while (expanded);
+
+	AssDialogue *start = nullptr;
+	AssDialogue *end = nullptr;
+	for (auto& line : context->ass->Events) {
+		if (line.Row < first || line.Row > last) continue;
+		if (!start) start = &line;
+		end = &line;
+		context->ass->DeleteExtradataValue(line, folds_key);
+	}
+	if (!start || !end || start == end) return;
+	RawAddFold(*start, *end, true);
+	context->ass->Commit(_("合并逻辑字幕组"), AssFile::COMMIT_FOLD);
+}
+
+void FoldController::ReleaseLineFromFold(AssDialogue& line) {
+	auto group = GetFoldLines(line);
+	if (group.size() < 2) return;
+	auto found = std::find(group.begin(), group.end(), &line);
+	if (found == group.end()) return;
+	size_t released = static_cast<size_t>(found - group.begin());
+	bool collapsed = group.front()->Fold.collapsed;
+
+	for (auto *member : group)
+		context->ass->DeleteExtradataValue(*member, folds_key);
+
+	if (released >= 2)
+		RawAddFold(*group.front(), *group[released - 1], collapsed);
+	if (group.size() - released - 1 >= 2)
+		RawAddFold(*group[released + 1], *group.back(), collapsed);
+
+	context->ass->Commit(_("从逻辑字幕组释放当前行"), AssFile::COMMIT_FOLD);
 }
 
 void FoldController::DoForAllFolds(std::function<void(AssDialogue&)> action) {
@@ -329,6 +415,7 @@ void FoldController::ClearFoldsAt(std::vector<AssDialogue *> const& lines) {
 		if (line.Fold.counterpart) {
 			line.Fold.counterpart->Fold.extraExists = false;
 			line.Fold.counterpart->Fold.valid = false;
+			UpdateLineExtradata(*line.Fold.counterpart);
 		}
 	});
 	context->ass->Commit(_("clear folds"), AssFile::COMMIT_FOLD);
