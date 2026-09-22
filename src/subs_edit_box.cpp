@@ -127,20 +127,20 @@ class BlockFeatureDialog final : public wxDialog {
 
 public:
 	explicit BlockFeatureDialog(wxWindow *parent)
-	: wxDialog(parent, wxID_ANY, _("新建 ASS 方块"), wxDefaultPosition, wxDefaultSize,
+	: wxDialog(parent, wxID_ANY, _("Create ASS block"), wxDefaultPosition, wxDefaultSize,
 		wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER)
 	{
 		auto *sizer = new wxBoxSizer(wxVERTICAL);
 		search = new wxSearchCtrl(this, wxID_ANY);
-		search->SetDescriptiveText(_("搜索中文功能名或 ASS 标签，例如：原点、an、frz"));
+		search->SetDescriptiveText(_("Search localized feature name or ASS tag, for example: anchor, an, frz"));
 		search->ShowCancelButton(true);
 		sizer->Add(search, wxSizerFlags().Expand().Border(wxALL));
 
 		list = new wxListCtrl(this, wxID_ANY, wxDefaultPosition, FromDIP(wxSize(520, 360)),
 			wxLC_REPORT | wxLC_SINGLE_SEL | wxLC_HRULES | wxLC_VRULES);
-		list->InsertColumn(0, _("分类"));
-		list->InsertColumn(1, _("功能"));
-		list->InsertColumn(2, _("ASS 标签"));
+		list->InsertColumn(0, _("Category"));
+		list->InsertColumn(1, _("Feature"));
+		list->InsertColumn(2, _("ASS tag"));
 		sizer->Add(list, wxSizerFlags(1).Expand().Border(wxLEFT | wxRIGHT));
 		sizer->Add(CreateSeparatedButtonSizer(wxOK | wxCANCEL), wxSizerFlags().Expand().Border(wxALL));
 		SetSizerAndFit(sizer);
@@ -266,12 +266,12 @@ SubsEditBox::SubsEditBox(wxWindow *parent, agi::Context *context)
 	block_panel = new wxPanel(this, wxID_ANY);
 	auto *block_sizer = new wxBoxSizer(wxVERTICAL);
 	auto *block_header = new wxBoxSizer(wxHORIZONTAL);
-	auto *new_block = new wxButton(block_panel, wxID_ANY, _("新建"));
-	new_block->SetToolTip(_("搜索并添加定位、字体、颜色、动画、裁剪等 ASS 功能"));
-	auto *templates = new wxButton(block_panel, wxID_ANY, _("模板"));
-	templates->SetToolTip(_("保存、分类或套用全局和项目字幕模板"));
-	show_ass_source = new wxCheckBox(block_panel, wxID_ANY, _("显示 ASS 源码"));
-	show_ass_source->SetToolTip(_("在方块编辑器下方显示并直接编辑完整 ASS 源码"));
+	auto *new_block = new wxButton(block_panel, wxID_ANY, _("New"));
+	new_block->SetToolTip(_("Search and add ASS features such as positioning, font, color, animation, and clipping"));
+	auto *templates = new wxButton(block_panel, wxID_ANY, _("Templates"));
+	templates->SetToolTip(_("Save, categorize, or apply global and project subtitle templates"));
+	show_ass_source = new wxCheckBox(block_panel, wxID_ANY, _("Show ASS source"));
+	show_ass_source->SetToolTip(_("Show and directly edit the complete ASS source below the block editor"));
 	block_header->Add(new_block, wxSizerFlags().Border(wxRIGHT));
 	block_header->Add(templates, wxSizerFlags().Border(wxRIGHT));
 	block_header->AddStretchSpacer();
@@ -280,10 +280,10 @@ SubsEditBox::SubsEditBox(wxWindow *parent, agi::Context *context)
 
 	block_list = new wxListCtrl(block_panel, wxID_ANY, wxDefaultPosition, FromDIP(wxSize(300, 82)),
 		wxLC_REPORT | wxLC_HRULES | wxLC_VRULES);
-	block_list->InsertColumn(0, _("功能方块"));
-	block_list->InsertColumn(1, _("ASS 内容"));
-	block_list->InsertColumn(2, _("分类"));
-	block_list->SetToolTip(_("单击选择；Ctrl/Shift 多选；双击编辑；支持复制、剪切、粘贴和 Delete"));
+	block_list->InsertColumn(0, _("Feature block"));
+	block_list->InsertColumn(1, _("ASS content"));
+	block_list->InsertColumn(2, _("Category"));
+	block_list->SetToolTip(_("Click to select; Ctrl/Shift for multiple selection; double-click to edit; supports copy, cut, paste, and Delete"));
 	block_sizer->Add(block_list, wxSizerFlags(1).Expand());
 	block_panel->SetSizer(block_sizer);
 	main_sizer->Add(block_panel, 1, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 3);
@@ -582,18 +582,18 @@ void SubsEditBox::OnBlockNew(wxCommandEvent&) {
 	std::optional<size_t> after;
 	if (!selected.empty()) after = selected.back();
 	if (block_model->Insert(after, *feature))
-		ApplyBlockChange(_("添加 ASS 方块"));
+		ApplyBlockChange(_("Add ASS block"));
 }
 
 void SubsEditBox::OnBlockActivate(wxListEvent& event) {
 	long row = event.GetIndex();
 	if (row < 0 || static_cast<size_t>(row) >= block_model->Items().size()) return;
 	auto const& item = block_model->Items()[static_cast<size_t>(row)];
-	wxTextEntryDialog dialog(this, _("修改这个方块对应的 ASS 内容："), _("编辑 ASS 方块"),
+	wxTextEntryDialog dialog(this, _("Edit the ASS content for this block:"), _("Edit ASS block"),
 		to_wx(item.source), wxOK | wxCANCEL | wxCENTRE | wxTE_MULTILINE);
 	dialog.SetSize(FromDIP(wxSize(520, 220)));
 	if (dialog.ShowModal() == wxID_OK && block_model->Replace(static_cast<size_t>(row), from_wx(dialog.GetValue())))
-		ApplyBlockChange(_("修改 ASS 方块"));
+		ApplyBlockChange(_("Edit ASS block"));
 }
 
 void SubsEditBox::CopyBlocks() {
@@ -610,7 +610,7 @@ void SubsEditBox::CutBlocks() {
 	wxTheClipboard->SetData(new wxTextDataObject(to_wx(source)));
 	wxTheClipboard->Close();
 	if (block_model->Delete(std::move(selected)))
-		ApplyBlockChange(_("剪切 ASS 方块"));
+		ApplyBlockChange(_("Cut ASS block"));
 }
 
 void SubsEditBox::PasteBlocks() {
@@ -623,12 +623,12 @@ void SubsEditBox::PasteBlocks() {
 	std::optional<size_t> after;
 	if (!selected.empty()) after = selected.back();
 	if (block_model->Paste(after, from_wx(data.GetText())))
-		ApplyBlockChange(_("粘贴 ASS 方块"));
+		ApplyBlockChange(_("Paste ASS block"));
 }
 
 void SubsEditBox::DeleteBlocks() {
 	if (block_model->Delete(SelectedBlocks()))
-		ApplyBlockChange(_("删除 ASS 方块"));
+		ApplyBlockChange(_("Delete ASS block"));
 }
 
 void SubsEditBox::OnBlockKeyDown(wxKeyEvent& event) {
@@ -651,11 +651,11 @@ void SubsEditBox::OnBlockContext(wxListEvent& event) {
 	if (event.GetIndex() >= 0 && !(block_list->GetItemState(event.GetIndex(), wxLIST_STATE_SELECTED) & wxLIST_STATE_SELECTED))
 		block_list->SetItemState(event.GetIndex(), wxLIST_STATE_SELECTED, wxLIST_STATE_SELECTED);
 	wxMenu menu;
-	menu.Append(wxID_COPY, _("复制"));
-	menu.Append(wxID_CUT, _("剪切"));
-	menu.Append(wxID_PASTE, _("粘贴"));
+	menu.Append(wxID_COPY, _("Copy"));
+	menu.Append(wxID_CUT, _("Cut"));
+	menu.Append(wxID_PASTE, _("Paste"));
 	menu.AppendSeparator();
-	menu.Append(wxID_DELETE, _("删除"));
+	menu.Append(wxID_DELETE, _("Delete"));
 	menu.Bind(wxEVT_MENU, [this](wxCommandEvent&) { CopyBlocks(); }, wxID_COPY);
 	menu.Bind(wxEVT_MENU, [this](wxCommandEvent&) { CutBlocks(); }, wxID_CUT);
 	menu.Bind(wxEVT_MENU, [this](wxCommandEvent&) { PasteBlocks(); }, wxID_PASTE);

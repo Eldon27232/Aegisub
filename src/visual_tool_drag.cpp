@@ -65,8 +65,8 @@ void VisualToolDrag::SetToolbar(wxToolBar *tb) {
 	segment_button_id = TOOL_FRAME_SEGMENTS;
 	toolbar->AddSeparator();
 	toolbar->AddTool(move_button_id, _("Toggle between \\move and \\pos"), GETBUNDLE(visual_move_conv_move, OPT_GET("App/Toolbar Icon Size")->GetInt()));
-	toolbar->AddTool(segment_button_id, _("按帧分段"), GETBUNDLE(visual_move, OPT_GET("App/Toolbar Icon Size")->GetInt()),
-		_("开启后，拖动和方向键微调会从当前真实视频帧开始建立 Hold 状态"), wxITEM_CHECK);
+	toolbar->AddTool(segment_button_id, _("Segment by frame"), GETBUNDLE(visual_move, OPT_GET("App/Toolbar Icon Size")->GetInt()),
+		_("When enabled, dragging and arrow-key nudging creates a held state from the current exact video frame"), wxITEM_CHECK);
 	toolbar->ToggleTool(segment_button_id, segment_by_frame);
 	toolbar->Realize();
 	toolbar->Show(true);
@@ -363,7 +363,7 @@ void VisualToolDrag::UpdateDrag(Feature *feature) {
 void VisualToolDrag::Commit(wxString message) {
 	file_changed_connection.Block();
 	if (message.empty())
-		message = segment_by_frame ? _("按帧调整字幕位置") : _("visual typesetting");
+		message = segment_by_frame ? _("Adjust subtitle position by frame") : _("visual typesetting");
 	int flags = AssFile::COMMIT_DIAG_TEXT;
 	if (pending_segment_change)
 		flags |= AssFile::COMMIT_DIAG_ADDREM | AssFile::COMMIT_DIAG_TIME | AssFile::COMMIT_FOLD;
@@ -388,7 +388,7 @@ bool VisualToolDrag::OnKeyDown(wxKeyEvent &event) {
 	primary->pos = FromScriptCoords(script_position);
 	EnsureFrameSegment(primary);
 	UpdateDrag(primary);
-	Commit(_("字幕位置 1 像素微调"));
+	Commit(_("Nudge subtitle position by 1 pixel"));
 	commit_id = -1;
 	parent->Render();
 	return true;

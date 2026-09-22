@@ -40,10 +40,10 @@ void VisualToolSubtitleMask::SetToolbar(wxToolBar *new_toolbar) {
 	toolbar = new_toolbar;
 	int icon_size = OPT_GET("App/Toolbar Icon Size")->GetInt();
 	toolbar->AddSeparator();
-	toolbar->AddTool(TOOL_RECTANGLE, _("矩形字幕遮挡"), GETBUNDLE(visual_clip, icon_size),
-		_("按住鼠标拖出矩形，仅隐藏所选字幕的这个区域"), wxITEM_CHECK);
-	toolbar->AddTool(TOOL_POLYGON, _("路径字幕遮挡"), GETBUNDLE(visual_vector_clip, icon_size),
-		_("逐点绘制，最后双击完成，右键取消绘制"), wxITEM_CHECK);
+	toolbar->AddTool(TOOL_RECTANGLE, _("Rectangle subtitle mask"), GETBUNDLE(visual_clip, icon_size),
+		_("Drag a rectangle to hide only this area of the selected subtitle"), wxITEM_CHECK);
+	toolbar->AddTool(TOOL_POLYGON, _("Path subtitle mask"), GETBUNDLE(visual_vector_clip, icon_size),
+		_("Click to add points, double-click to finish, or right-click to cancel drawing"), wxITEM_CHECK);
 
 	auto add_button = [&](wxString const& label, wxString const& tip, auto action) {
 		auto *button = new wxButton(toolbar, wxID_ANY, label);
@@ -51,19 +51,19 @@ void VisualToolSubtitleMask::SetToolbar(wxToolBar *new_toolbar) {
 		button->Bind(wxEVT_BUTTON, action);
 		toolbar->AddControl(button);
 	};
-	add_button(_("缩小"), _("以遮挡区域中心缩小 10%"), [this](wxCommandEvent&) {
-		TransformMask(0.9, 0.0, _("缩小字幕遮挡"));
+	add_button(_("Shrink"), _("Shrink by 10% around the mask center"), [this](wxCommandEvent&) {
+		TransformMask(0.9, 0.0, _("Shrink subtitle mask"));
 	});
-	add_button(_("放大"), _("以遮挡区域中心放大 10%"), [this](wxCommandEvent&) {
-		TransformMask(1.1, 0.0, _("放大字幕遮挡"));
+	add_button(_("Enlarge"), _("Enlarge by 10% around the mask center"), [this](wxCommandEvent&) {
+		TransformMask(1.1, 0.0, _("Enlarge subtitle mask"));
 	});
-	add_button(_("左转"), _("将遮挡区域逆时针旋转 5 度"), [this](wxCommandEvent&) {
-		TransformMask(1.0, -5.0, _("旋转字幕遮挡"));
+	add_button(_("Rotate left"), _("Rotate the mask 5 degrees counterclockwise"), [this](wxCommandEvent&) {
+		TransformMask(1.0, -5.0, _("Rotate subtitle mask"));
 	});
-	add_button(_("右转"), _("将遮挡区域顺时针旋转 5 度"), [this](wxCommandEvent&) {
-		TransformMask(1.0, 5.0, _("旋转字幕遮挡"));
+	add_button(_("Rotate right"), _("Rotate the mask 5 degrees clockwise"), [this](wxCommandEvent&) {
+		TransformMask(1.0, 5.0, _("Rotate subtitle mask"));
 	});
-	add_button(_("取消遮挡"), _("从当前帧开始取消这条字幕的遮挡"), [this](wxCommandEvent&) {
+	add_button(_("Cancel mask"), _("Cancel this subtitle mask from the current frame"), [this](wxCommandEvent&) {
 		CancelMask();
 	});
 
@@ -186,7 +186,7 @@ void VisualToolSubtitleMask::CancelMask() {
 	int flags = AssFile::COMMIT_DIAG_TEXT;
 	if (plan.split) flags |= AssFile::COMMIT_DIAG_ADDREM | AssFile::COMMIT_DIAG_TIME | AssFile::COMMIT_FOLD;
 	file_changed_connection.Block();
-	commit_id = c->ass->Commit(_("取消字幕遮挡"), flags, -1, plan.split ? nullptr : active_line);
+	commit_id = c->ass->Commit(_("Cancel subtitle mask"), flags, -1, plan.split ? nullptr : active_line);
 	file_changed_connection.Unblock();
 	parent->Render();
 }
@@ -198,7 +198,7 @@ void VisualToolSubtitleMask::TransformMask(double scale, double degrees, wxStrin
 }
 
 void VisualToolSubtitleMask::UpdateMask() {
-	ApplyMask(points, false, _("调整字幕遮挡"));
+	ApplyMask(points, false, _("Adjust subtitle mask"));
 }
 
 void VisualToolSubtitleMask::DoRefresh() {
@@ -227,7 +227,7 @@ void VisualToolSubtitleMask::OnMouseEvent(wxMouseEvent& event) {
 			std::abs(pending_points.back().y - point.y) > 0.5)
 			pending_points.push_back(point);
 		if (pending_points.size() >= 3)
-			ApplyMask(pending_points, false, _("创建字幕遮挡"));
+			ApplyMask(pending_points, false, _("Create subtitle mask"));
 		pending_points.clear();
 		parent->Render();
 		return;
@@ -282,7 +282,7 @@ void VisualToolSubtitleMask::OnMouseEvent(wxMouseEvent& event) {
 			auto b = ScriptPoint(mouse_pos);
 			if (std::abs(a.x - b.x) >= 2.0 && std::abs(a.y - b.y) >= 2.0)
 				ApplyMask({{a.x, a.y}, {b.x, a.y}, {b.x, b.y}, {a.x, b.y}}, true,
-					_("创建字幕遮挡"));
+					_("Create subtitle mask"));
 		}
 		rectangle_drawing = false;
 		moving_shape = false;

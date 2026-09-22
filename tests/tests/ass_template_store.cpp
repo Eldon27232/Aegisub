@@ -17,7 +17,7 @@ using ass::templates::Scope;
 TEST(ass_template_store, global_and_project_records_roundtrip_without_touching_ass_text) {
 	std::vector<Entry> entries = {
 		{"global:1", "弹幕|气泡", "常用:动画", "{\\t(0,250,\\fscx100)}\\n中文#1", Scope::Global},
-		{"project:1", "画面标题", "项目", "{\\pos(500,500)\\3c&HA87FFF&}正文", Scope::Project}
+		{"project:1", "画面标题", "Project", "{\\pos(500,500)\\3c&HA87FFF&}正文", Scope::Project}
 	};
 
 	auto global = ass::templates::Decode(ass::templates::Encode(entries, Scope::Global), Scope::Global);
@@ -45,10 +45,10 @@ TEST(ass_template_store, extracts_and_applies_common_parameters_through_ast) {
 		"\\3c&HA87FFF&\\pos(500,500)\\vendor(keep)}\\n中文";
 	auto parameters = ass::templates::ExtractParameters(source);
 	EXPECT_TRUE(std::any_of(parameters.begin(), parameters.end(), [](auto const& parameter) {
-		return parameter.id == "tag:\\pos:0:0" && parameter.label == "位置 X" && parameter.value == "500";
+		return parameter.id == "tag:\\pos:0:0" && parameter.label == "Position X" && parameter.value == "500";
 	}));
 	EXPECT_TRUE(std::any_of(parameters.begin(), parameters.end(), [](auto const& parameter) {
-		return parameter.id == "tag:\\3c:0:0" && parameter.label == "描边颜色";
+		return parameter.id == "tag:\\3c:0:0" && parameter.label == "Outline color";
 	}));
 	EXPECT_TRUE(std::any_of(parameters.begin(), parameters.end(), [](auto const& parameter) {
 		return parameter.id == "text:0" && parameter.value == "\\n中文";

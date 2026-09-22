@@ -7,6 +7,7 @@
 #include "ass_block_editor_model.h"
 
 #include "ass_override_ast.h"
+#include "format.h"
 
 #include <algorithm>
 #include <cctype>
@@ -15,6 +16,10 @@
 
 namespace ass::blocks {
 namespace {
+
+std::string translated(wxString const& value) {
+	return std::string(wxGetTranslation(value).utf8_str());
+}
 
 std::string lower_ascii(std::string_view value) {
 	std::string result(value);
@@ -26,39 +31,39 @@ std::string lower_ascii(std::string_view value) {
 }
 
 std::string label_for_tag(std::string_view name) {
-	static const std::unordered_map<std::string_view, std::string_view> labels = {
-		{"\\an", "原点/对齐"}, {"\\pos", "位置"}, {"\\move", "移动"}, {"\\org", "旋转原点"},
-		{"\\fn", "字体"}, {"\\fs", "字号"}, {"\\fs+", "增大字号"}, {"\\fs-", "减小字号"},
-		{"\\b", "粗体"}, {"\\i", "斜体"}, {"\\u", "下划线"}, {"\\s", "删除线"},
-		{"\\fsp", "字距"}, {"\\fe", "字体编码"}, {"\\fscx", "X 缩放"}, {"\\fscy", "Y 缩放"},
-		{"\\frx", "X 轴旋转"}, {"\\fry", "Y 轴旋转"}, {"\\frz", "Z 轴旋转"}, {"\\fr", "Z 轴旋转"},
-		{"\\fax", "X 轴倾斜"}, {"\\fay", "Y 轴倾斜"},
-		{"\\c", "正文颜色"}, {"\\1c", "正文颜色"}, {"\\2c", "次要颜色"}, {"\\3c", "描边颜色"}, {"\\4c", "阴影颜色"},
-		{"\\alpha", "全局透明度"}, {"\\1a", "正文透明度"}, {"\\2a", "次要透明度"}, {"\\3a", "描边透明度"}, {"\\4a", "阴影透明度"},
-		{"\\bord", "描边宽度"}, {"\\xbord", "X 描边宽度"}, {"\\ybord", "Y 描边宽度"},
-		{"\\shad", "阴影距离"}, {"\\xshad", "X 阴影距离"}, {"\\yshad", "Y 阴影距离"},
-		{"\\blur", "高斯模糊"}, {"\\be", "边缘模糊"},
-		{"\\t", "动画变换"}, {"\\fad", "淡入淡出"}, {"\\fade", "高级淡入淡出"},
-		{"\\clip", "裁剪"}, {"\\iclip", "反向裁剪"}, {"\\p", "Drawing 模式"}, {"\\pbo", "Drawing 基线"},
-		{"\\r", "重置样式"}, {"\\q", "换行方式"},
-		{"\\k", "Karaoke"}, {"\\K", "Karaoke 平滑"}, {"\\kf", "Karaoke 填充"}, {"\\ko", "Karaoke 描边"}, {"\\kt", "Karaoke 时间"}
+	static const std::unordered_map<std::string_view, wxString> labels = {
+		{"\\an", wxTRANSLATE("Anchor/Alignment")}, {"\\pos", wxTRANSLATE("Position")}, {"\\move", wxTRANSLATE("Move")}, {"\\org", wxTRANSLATE("Rotation origin")},
+		{"\\fn", wxTRANSLATE("Font")}, {"\\fs", wxTRANSLATE("Font size")}, {"\\fs+", wxTRANSLATE("Increase font size")}, {"\\fs-", wxTRANSLATE("Decrease font size")},
+		{"\\b", wxTRANSLATE("Bold")}, {"\\i", wxTRANSLATE("Italic")}, {"\\u", wxTRANSLATE("Underline")}, {"\\s", wxTRANSLATE("Strikeout")},
+		{"\\fsp", wxTRANSLATE("Character spacing")}, {"\\fe", wxTRANSLATE("Font encoding")}, {"\\fscx", wxTRANSLATE("X scale")}, {"\\fscy", wxTRANSLATE("Y scale")},
+		{"\\frx", wxTRANSLATE("X rotation")}, {"\\fry", wxTRANSLATE("Y rotation")}, {"\\frz", wxTRANSLATE("Z rotation")}, {"\\fr", wxTRANSLATE("Z rotation")},
+		{"\\fax", wxTRANSLATE("X shear")}, {"\\fay", wxTRANSLATE("Y shear")},
+		{"\\c", wxTRANSLATE("Primary color")}, {"\\1c", wxTRANSLATE("Primary color")}, {"\\2c", wxTRANSLATE("Secondary color")}, {"\\3c", wxTRANSLATE("Outline color")}, {"\\4c", wxTRANSLATE("Shadow color")},
+		{"\\alpha", wxTRANSLATE("Global opacity")}, {"\\1a", wxTRANSLATE("Primary opacity")}, {"\\2a", wxTRANSLATE("Secondary opacity")}, {"\\3a", wxTRANSLATE("Outline opacity")}, {"\\4a", wxTRANSLATE("Shadow opacity")},
+		{"\\bord", wxTRANSLATE("Outline width")}, {"\\xbord", wxTRANSLATE("X outline width")}, {"\\ybord", wxTRANSLATE("Y outline width")},
+		{"\\shad", wxTRANSLATE("Shadow distance")}, {"\\xshad", wxTRANSLATE("X shadow distance")}, {"\\yshad", wxTRANSLATE("Y shadow distance")},
+		{"\\blur", wxTRANSLATE("Gaussian blur")}, {"\\be", wxTRANSLATE("Edge blur")},
+		{"\\t", wxTRANSLATE("Transform")}, {"\\fad", wxTRANSLATE("Fade")}, {"\\fade", wxTRANSLATE("Advanced fade")},
+		{"\\clip", wxTRANSLATE("Clip")}, {"\\iclip", wxTRANSLATE("Inverse clip")}, {"\\p", wxTRANSLATE("Drawing mode")}, {"\\pbo", wxTRANSLATE("Drawing baseline")},
+		{"\\r", wxTRANSLATE("Reset style")}, {"\\q", wxTRANSLATE("Wrapping style")},
+		{"\\k", wxTRANSLATE("Karaoke")}, {"\\K", wxTRANSLATE("Karaoke sweep")}, {"\\kf", wxTRANSLATE("Karaoke fill")}, {"\\ko", wxTRANSLATE("Karaoke outline")}, {"\\kt", wxTRANSLATE("Karaoke timing")}
 	};
 	auto it = labels.find(name);
-	return it == labels.end() ? "ASS 标签" : std::string(it->second);
+	return it == labels.end() ? translated(_("ASS tag")) : translated(it->second);
 }
 
 std::string category_for_tag(std::string_view name) {
-	if (name == "\\an" || name == "\\pos" || name == "\\move" || name == "\\org") return "定位";
-	if (name == "\\fn" || name == "\\fs" || name == "\\fs+" || name == "\\fs-" || name == "\\b" || name == "\\i" || name == "\\u" || name == "\\s" || name == "\\fsp" || name == "\\fe") return "字体";
-	if (name == "\\fscx" || name == "\\fscy") return "缩放";
-	if (name == "\\frx" || name == "\\fry" || name == "\\frz" || name == "\\fr" || name == "\\fax" || name == "\\fay") return "旋转/透视";
-	if (name == "\\c" || name == "\\1c" || name == "\\2c" || name == "\\3c" || name == "\\4c" || name == "\\alpha" || name == "\\1a" || name == "\\2a" || name == "\\3a" || name == "\\4a") return "颜色";
-	if (name == "\\bord" || name == "\\xbord" || name == "\\ybord" || name == "\\shad" || name == "\\xshad" || name == "\\yshad" || name == "\\blur" || name == "\\be") return "边缘";
-	if (name == "\\t" || name == "\\fad" || name == "\\fade") return "动画";
-	if (name == "\\clip" || name == "\\iclip") return "裁剪";
-	if (name == "\\p" || name == "\\pbo") return "Drawing";
-	if (name == "\\k" || name == "\\K" || name == "\\kf" || name == "\\ko" || name == "\\kt") return "Karaoke";
-	return "高级";
+	if (name == "\\an" || name == "\\pos" || name == "\\move" || name == "\\org") return translated(_("Positioning"));
+	if (name == "\\fn" || name == "\\fs" || name == "\\fs+" || name == "\\fs-" || name == "\\b" || name == "\\i" || name == "\\u" || name == "\\s" || name == "\\fsp" || name == "\\fe") return translated(_("Font"));
+	if (name == "\\fscx" || name == "\\fscy") return translated(_("Scale"));
+	if (name == "\\frx" || name == "\\fry" || name == "\\frz" || name == "\\fr" || name == "\\fax" || name == "\\fay") return translated(_("Rotation/Perspective"));
+	if (name == "\\c" || name == "\\1c" || name == "\\2c" || name == "\\3c" || name == "\\4c" || name == "\\alpha" || name == "\\1a" || name == "\\2a" || name == "\\3a" || name == "\\4a") return translated(_("Color"));
+	if (name == "\\bord" || name == "\\xbord" || name == "\\ybord" || name == "\\shad" || name == "\\xshad" || name == "\\yshad" || name == "\\blur" || name == "\\be") return translated(_("Border"));
+	if (name == "\\t" || name == "\\fad" || name == "\\fade") return translated(_("Animation"));
+	if (name == "\\clip" || name == "\\iclip") return translated(_("Clip"));
+	if (name == "\\p" || name == "\\pbo") return translated(_("Drawing"));
+	if (name == "\\k" || name == "\\K" || name == "\\kf" || name == "\\ko" || name == "\\kt") return translated(_("Karaoke"));
+	return translated(_("Advanced"));
 }
 
 template<class T>
@@ -138,8 +143,8 @@ void Model::RebuildItems() {
 				}
 				else {
 					item.kind = ItemKind::Raw;
-					item.label = "原始 ASS";
-					item.category = "高级";
+					item.label = translated(_("Raw ASS"));
+					item.category = translated(_("Advanced"));
 				}
 				items_.push_back(std::move(item));
 				locations_.push_back({part_index, node_index, true});
@@ -151,13 +156,13 @@ void Model::RebuildItems() {
 		item.source = SerializePart(part);
 		switch (part.kind) {
 			case PartKind::Text:
-				item.kind = ItemKind::Text; item.label = "正文"; item.category = "正文"; break;
+				item.kind = ItemKind::Text; item.label = translated(_("Text")); item.category = translated(_("Text")); break;
 			case PartKind::Comment:
-				item.kind = ItemKind::Comment; item.label = "注释"; item.category = "高级"; break;
+				item.kind = ItemKind::Comment; item.label = translated(_("Comment")); item.category = translated(_("Advanced")); break;
 			case PartKind::Drawing:
-				item.kind = ItemKind::Drawing; item.label = "ASS Drawing"; item.category = "Drawing"; break;
+				item.kind = ItemKind::Drawing; item.label = translated(_("ASS Drawing")); item.category = translated(_("Drawing")); break;
 			case PartKind::Override:
-				item.kind = ItemKind::Raw; item.label = "原始 ASS"; item.category = "高级"; break;
+				item.kind = ItemKind::Raw; item.label = translated(_("Raw ASS")); item.category = translated(_("Advanced")); break;
 		}
 		items_.push_back(std::move(item));
 		locations_.push_back({part_index, 0, false});
@@ -318,36 +323,36 @@ bool Model::Insert(std::optional<size_t> after, Feature const& feature) {
 
 std::vector<Feature> const& Model::Features() {
 	static const std::vector<Feature> features = {
-		{"定位", "原点/对齐", "an", "{\\an8}"}, {"定位", "位置", "pos", "{\\pos(0,0)}"},
-		{"定位", "移动", "move", "{\\move(0,0,100,100)}"}, {"定位", "旋转原点", "org", "{\\org(0,0)}"},
-		{"字体", "字体", "fn", "{\\fnArial}"}, {"字体", "字号", "fs", "{\\fs50}"},
-		{"字体", "粗体", "b", "{\\b1}"}, {"字体", "斜体", "i", "{\\i1}"},
-		{"字体", "下划线", "u", "{\\u1}"}, {"字体", "删除线", "s", "{\\s1}"},
-		{"字体", "字距", "fsp", "{\\fsp0}"}, {"字体", "字体编码", "fe", "{\\fe1}"},
-		{"缩放", "X 缩放", "fscx", "{\\fscx100}"}, {"缩放", "Y 缩放", "fscy", "{\\fscy100}"},
-		{"旋转/透视", "X 轴旋转", "frx", "{\\frx0}"}, {"旋转/透视", "Y 轴旋转", "fry", "{\\fry0}"},
-		{"旋转/透视", "Z 轴旋转", "frz", "{\\frz0}"}, {"旋转/透视", "X 轴倾斜", "fax", "{\\fax0}"},
-		{"旋转/透视", "Y 轴倾斜", "fay", "{\\fay0}"},
-		{"颜色", "正文颜色", "1c", "{\\1c&HFFFFFF&}"}, {"颜色", "次要颜色", "2c", "{\\2c&HFFFFFF&}"},
-		{"颜色", "描边颜色", "3c", "{\\3c&H000000&}"}, {"颜色", "阴影颜色", "4c", "{\\4c&H000000&}"},
-		{"颜色", "全局透明度", "alpha", "{\\alpha&H00&}"}, {"颜色", "正文透明度", "1a", "{\\1a&H00&}"},
-		{"颜色", "次要透明度", "2a", "{\\2a&H00&}"}, {"颜色", "描边透明度", "3a", "{\\3a&H00&}"},
-		{"颜色", "阴影透明度", "4a", "{\\4a&H00&}"},
-		{"边缘", "描边宽度", "bord", "{\\bord2}"}, {"边缘", "X 描边宽度", "xbord", "{\\xbord2}"},
-		{"边缘", "Y 描边宽度", "ybord", "{\\ybord2}"}, {"边缘", "阴影距离", "shad", "{\\shad2}"},
-		{"边缘", "X 阴影距离", "xshad", "{\\xshad2}"}, {"边缘", "Y 阴影距离", "yshad", "{\\yshad2}"},
-		{"边缘", "高斯模糊", "blur", "{\\blur1}"}, {"边缘", "边缘模糊", "be", "{\\be1}"},
-		{"动画", "动画变换", "t", "{\\t(0,250,\\fscx100\\fscy100)}"},
-		{"动画", "淡入淡出", "fad", "{\\fad(200,200)}"}, {"动画", "高级淡入淡出", "fade", "{\\fade(255,0,255,0,200,800,1000)}"},
-		{"裁剪", "矩形裁剪", "clip", "{\\clip(0,0,100,100)}"}, {"裁剪", "矢量裁剪", "clip", "{\\clip(m 0 0 l 100 0 100 100 0 100)}"},
-		{"裁剪", "反向裁剪", "iclip", "{\\iclip(0,0,100,100)}"},
-		{"Drawing", "ASS Drawing", "p", "{\\p1}m 0 0 l 100 0 100 100 0 100{\\p0}"},
-		{"Drawing", "Drawing 基线", "pbo", "{\\pbo0}"},
-		{"Karaoke", "Karaoke", "k", "{\\k20}"}, {"Karaoke", "Karaoke 平滑", "K", "{\\K20}"},
-		{"Karaoke", "Karaoke 填充", "kf", "{\\kf20}"}, {"Karaoke", "Karaoke 描边", "ko", "{\\ko20}"},
-		{"Karaoke", "Karaoke 时间", "kt", "{\\kt20}"},
-		{"高级", "重置样式", "r", "{\\r}"}, {"高级", "换行方式", "q", "{\\q2}"},
-		{"高级", "硬换行", "N", "\\N"}, {"高级", "软换行", "n", "\\n"}, {"高级", "不换行空格", "h", "\\h"}
+		{translated(_("Positioning")), translated(_("Anchor/Alignment")), "an", "{\\an8}"}, {translated(_("Positioning")), translated(_("Position")), "pos", "{\\pos(0,0)}"},
+		{translated(_("Positioning")), translated(_("Move")), "move", "{\\move(0,0,100,100)}"}, {translated(_("Positioning")), translated(_("Rotation origin")), "org", "{\\org(0,0)}"},
+		{translated(_("Font")), translated(_("Font")), "fn", "{\\fnArial}"}, {translated(_("Font")), translated(_("Font size")), "fs", "{\\fs50}"},
+		{translated(_("Font")), translated(_("Bold")), "b", "{\\b1}"}, {translated(_("Font")), translated(_("Italic")), "i", "{\\i1}"},
+		{translated(_("Font")), translated(_("Underline")), "u", "{\\u1}"}, {translated(_("Font")), translated(_("Strikeout")), "s", "{\\s1}"},
+		{translated(_("Font")), translated(_("Character spacing")), "fsp", "{\\fsp0}"}, {translated(_("Font")), translated(_("Font encoding")), "fe", "{\\fe1}"},
+		{translated(_("Scale")), translated(_("X scale")), "fscx", "{\\fscx100}"}, {translated(_("Scale")), translated(_("Y scale")), "fscy", "{\\fscy100}"},
+		{translated(_("Rotation/Perspective")), translated(_("X rotation")), "frx", "{\\frx0}"}, {translated(_("Rotation/Perspective")), translated(_("Y rotation")), "fry", "{\\fry0}"},
+		{translated(_("Rotation/Perspective")), translated(_("Z rotation")), "frz", "{\\frz0}"}, {translated(_("Rotation/Perspective")), translated(_("X shear")), "fax", "{\\fax0}"},
+		{translated(_("Rotation/Perspective")), translated(_("Y shear")), "fay", "{\\fay0}"},
+		{translated(_("Color")), translated(_("Primary color")), "1c", "{\\1c&HFFFFFF&}"}, {translated(_("Color")), translated(_("Secondary color")), "2c", "{\\2c&HFFFFFF&}"},
+		{translated(_("Color")), translated(_("Outline color")), "3c", "{\\3c&H000000&}"}, {translated(_("Color")), translated(_("Shadow color")), "4c", "{\\4c&H000000&}"},
+		{translated(_("Color")), translated(_("Global opacity")), "alpha", "{\\alpha&H00&}"}, {translated(_("Color")), translated(_("Primary opacity")), "1a", "{\\1a&H00&}"},
+		{translated(_("Color")), translated(_("Secondary opacity")), "2a", "{\\2a&H00&}"}, {translated(_("Color")), translated(_("Outline opacity")), "3a", "{\\3a&H00&}"},
+		{translated(_("Color")), translated(_("Shadow opacity")), "4a", "{\\4a&H00&}"},
+		{translated(_("Border")), translated(_("Outline width")), "bord", "{\\bord2}"}, {translated(_("Border")), translated(_("X outline width")), "xbord", "{\\xbord2}"},
+		{translated(_("Border")), translated(_("Y outline width")), "ybord", "{\\ybord2}"}, {translated(_("Border")), translated(_("Shadow distance")), "shad", "{\\shad2}"},
+		{translated(_("Border")), translated(_("X shadow distance")), "xshad", "{\\xshad2}"}, {translated(_("Border")), translated(_("Y shadow distance")), "yshad", "{\\yshad2}"},
+		{translated(_("Border")), translated(_("Gaussian blur")), "blur", "{\\blur1}"}, {translated(_("Border")), translated(_("Edge blur")), "be", "{\\be1}"},
+		{translated(_("Animation")), translated(_("Transform")), "t", "{\\t(0,250,\\fscx100\\fscy100)}"},
+		{translated(_("Animation")), translated(_("Fade")), "fad", "{\\fad(200,200)}"}, {translated(_("Animation")), translated(_("Advanced fade")), "fade", "{\\fade(255,0,255,0,200,800,1000)}"},
+		{translated(_("Clip")), translated(_("Rectangle clip")), "clip", "{\\clip(0,0,100,100)}"}, {translated(_("Clip")), translated(_("Vector clip")), "clip", "{\\clip(m 0 0 l 100 0 100 100 0 100)}"},
+		{translated(_("Clip")), translated(_("Inverse clip")), "iclip", "{\\iclip(0,0,100,100)}"},
+		{translated(_("Drawing")), translated(_("ASS Drawing")), "p", "{\\p1}m 0 0 l 100 0 100 100 0 100{\\p0}"},
+		{translated(_("Drawing")), translated(_("Drawing baseline")), "pbo", "{\\pbo0}"},
+		{translated(_("Karaoke")), translated(_("Karaoke")), "k", "{\\k20}"}, {translated(_("Karaoke")), translated(_("Karaoke sweep")), "K", "{\\K20}"},
+		{translated(_("Karaoke")), translated(_("Karaoke fill")), "kf", "{\\kf20}"}, {translated(_("Karaoke")), translated(_("Karaoke outline")), "ko", "{\\ko20}"},
+		{translated(_("Karaoke")), translated(_("Karaoke timing")), "kt", "{\\kt20}"},
+		{translated(_("Advanced")), translated(_("Reset style")), "r", "{\\r}"}, {translated(_("Advanced")), translated(_("Wrapping style")), "q", "{\\q2}"},
+		{translated(_("Advanced")), translated(_("Hard line break")), "N", "\\N"}, {translated(_("Advanced")), translated(_("Soft line break")), "n", "\\n"}, {translated(_("Advanced")), translated(_("Non-breaking space")), "h", "\\h"}
 	};
 	return features;
 }

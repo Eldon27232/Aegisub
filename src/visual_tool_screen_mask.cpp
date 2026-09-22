@@ -67,7 +67,7 @@ class ScreenMaskSettingsDialog final : public wxDialog {
 public:
 	ScreenMaskSettingsDialog(wxWindow *parent, agi::Context *context,
 		VisualToolScreenMask::Settings const& initial, int maximum_frame)
-	: wxDialog(parent, wxID_ANY, _("画面遮罩设置"), wxDefaultPosition, wxDefaultSize,
+	: wxDialog(parent, wxID_ANY, _("Screen mask settings"), wxDefaultPosition, wxDefaultSize,
 		wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER)
 	, value(initial)
 	, context(context)
@@ -76,40 +76,40 @@ public:
 		auto *grid = new wxFlexGridSizer(2, FromDIP(8), FromDIP(10));
 		grid->AddGrowableCol(1, 1);
 
-		grid->Add(new wxStaticText(this, wxID_ANY, _("持续范围")), wxSizerFlags().CenterVertical());
+		grid->Add(new wxStaticText(this, wxID_ANY, _("Duration")), wxSizerFlags().CenterVertical());
 		duration = new wxChoice(this, wxID_ANY);
-		duration->Append(_("当前 1 帧（默认）"));
-		duration->Append(_("从当前帧起持续多帧"));
-		duration->Append(_("从当前帧到指定时间"));
-		duration->Append(_("从当前帧到当前字幕结束"));
-		duration->Append(_("自定义起止帧"));
+		duration->Append(_("Current frame only (default)"));
+		duration->Append(_("Multiple frames from the current frame"));
+		duration->Append(_("From the current frame to a specified time"));
+		duration->Append(_("From the current frame to the end of the current subtitle"));
+		duration->Append(_("Custom start and end frames"));
 		duration->SetSelection(static_cast<int>(value.duration));
 		grid->Add(duration, wxSizerFlags(1).Expand());
 
-		grid->Add(new wxStaticText(this, wxID_ANY, _("多帧数量")), wxSizerFlags().CenterVertical());
+		grid->Add(new wxStaticText(this, wxID_ANY, _("Number of frames")), wxSizerFlags().CenterVertical());
 		frame_count = new wxSpinCtrl(this, wxID_ANY, "", wxDefaultPosition, wxDefaultSize,
 			wxSP_ARROW_KEYS, 1, std::max(1, maximum_frame + 1), value.frame_count);
 		grid->Add(frame_count, wxSizerFlags(1).Expand());
 
-		grid->Add(new wxStaticText(this, wxID_ANY, _("指定结束时间")), wxSizerFlags().CenterVertical());
+		grid->Add(new wxStaticText(this, wxID_ANY, _("Specified end time")), wxSizerFlags().CenterVertical());
 		until_time = new TimeEdit(this, wxID_ANY, context,
 			agi::Time(context->videoController->TimeAtFrame(value.until_frame, agi::vfr::END)).GetAssFormatted(),
 			wxDefaultSize, true);
 		grid->Add(until_time, wxSizerFlags(1).Expand());
 
-		grid->Add(new wxStaticText(this, wxID_ANY, _("自定义开始帧")), wxSizerFlags().CenterVertical());
+		grid->Add(new wxStaticText(this, wxID_ANY, _("Custom start frame")), wxSizerFlags().CenterVertical());
 		custom_start = new wxSpinCtrl(this, wxID_ANY, "", wxDefaultPosition, wxDefaultSize,
 			wxSP_ARROW_KEYS, 0, maximum_frame, value.custom_start_frame);
 		grid->Add(custom_start, wxSizerFlags(1).Expand());
-		grid->Add(new wxStaticText(this, wxID_ANY, _("自定义结束帧")), wxSizerFlags().CenterVertical());
+		grid->Add(new wxStaticText(this, wxID_ANY, _("Custom end frame")), wxSizerFlags().CenterVertical());
 		custom_end = new wxSpinCtrl(this, wxID_ANY, "", wxDefaultPosition, wxDefaultSize,
 			wxSP_ARROW_KEYS, 0, maximum_frame, value.custom_end_frame);
 		grid->Add(custom_end, wxSizerFlags(1).Expand());
 
-		grid->Add(new wxStaticText(this, wxID_ANY, _("遮罩颜色")), wxSizerFlags().CenterVertical());
+		grid->Add(new wxStaticText(this, wxID_ANY, _("Mask color")), wxSizerFlags().CenterVertical());
 		colour = new ColourButton(this, FromDIP(wxSize(80, 18)), false, value.colour, wxDefaultValidator, context);
 		grid->Add(colour, wxSizerFlags().Left());
-		grid->Add(new wxStaticText(this, wxID_ANY, _("不透明度（0-100%）")), wxSizerFlags().CenterVertical());
+		grid->Add(new wxStaticText(this, wxID_ANY, _("Opacity (0-100%)")), wxSizerFlags().CenterVertical());
 		opacity = new wxSpinCtrl(this, wxID_ANY, "", wxDefaultPosition, wxDefaultSize,
 			wxSP_ARROW_KEYS, 0, 100, value.opacity);
 		grid->Add(opacity, wxSizerFlags(1).Expand());
@@ -119,7 +119,7 @@ public:
 		grid->Add(layer, wxSizerFlags(1).Expand());
 
 		sizer->Add(new wxStaticText(this, wxID_ANY,
-			_("颜色按钮复用统一调色盘、吸色笔、最近颜色和项目常用颜色。")),
+			_("The color button uses the shared palette, eyedropper, recent colors, and frequently used project colors.")),
 			wxSizerFlags().Expand().Border(wxALL));
 		sizer->Add(grid, wxSizerFlags(1).Expand().Border(wxLEFT | wxRIGHT | wxBOTTOM));
 		sizer->Add(CreateSeparatedButtonSizer(wxOK | wxCANCEL), wxSizerFlags().Expand().Border(wxALL));
@@ -162,12 +162,12 @@ void VisualToolScreenMask::SetToolbar(wxToolBar *new_toolbar) {
 	toolbar = new_toolbar;
 	int icon_size = OPT_GET("App/Toolbar Icon Size")->GetInt();
 	toolbar->AddSeparator();
-	toolbar->AddTool(TOOL_RECTANGLE, _("矩形遮罩"), GETBUNDLE(visual_clip, icon_size),
-		_("按住鼠标拖出矩形画面遮罩"), wxITEM_CHECK);
-	toolbar->AddTool(TOOL_POLYGON, _("多边形遮罩"), GETBUNDLE(visual_vector_clip, icon_size),
-		_("逐点绘制，多边形最后双击完成，右键取消"), wxITEM_CHECK);
-	auto *settings_button = new wxButton(toolbar, wxID_ANY, _("颜色 / 时间 / 图层"));
-	settings_button->SetToolTip(_("设置遮罩颜色、不透明度、Layer 和按帧持续范围"));
+	toolbar->AddTool(TOOL_RECTANGLE, _("Rectangle mask"), GETBUNDLE(visual_clip, icon_size),
+		_("Drag to draw a rectangular screen mask"), wxITEM_CHECK);
+	toolbar->AddTool(TOOL_POLYGON, _("Polygon mask"), GETBUNDLE(visual_vector_clip, icon_size),
+		_("Click to add points, double-click to finish the polygon, or right-click to cancel"), wxITEM_CHECK);
+	auto *settings_button = new wxButton(toolbar, wxID_ANY, _("Color / Time / Layer"));
+	settings_button->SetToolTip(_("Set mask color, opacity, layer, and frame-based duration"));
 	toolbar->AddControl(settings_button);
 	toolbar->Bind(wxEVT_TOOL, &VisualToolScreenMask::OnTool, this, TOOL_RECTANGLE, TOOL_POLYGON);
 	settings_button->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { OpenSettings(); });
@@ -204,7 +204,7 @@ void VisualToolScreenMask::OpenSettings() {
 	if (active_line && active_line->Effect.get() == SCREEN_MASK_EFFECT) {
 		active_line->Text = ass::screen_mask::UpdateAppearance(active_line->Text.get(), settings.colour, settings.opacity);
 		active_line->Layer = settings.layer;
-		c->ass->Commit(_("修改画面遮罩外观"), AssFile::COMMIT_DIAG_FULL, -1, active_line);
+		c->ass->Commit(_("Change screen mask appearance"), AssFile::COMMIT_DIAG_FULL, -1, active_line);
 	}
 	parent->Render();
 }
@@ -267,7 +267,7 @@ void VisualToolScreenMask::CreateMask(std::vector<ass::screen_mask::Point> const
 		c->ass->Events.insert(++c->ass->iterator_to(*anchor), *created);
 	else
 		c->ass->Events.push_back(*created);
-	c->ass->Commit(_("创建画面遮罩"), AssFile::COMMIT_DIAG_ADDREM);
+	c->ass->Commit(_("Create screen mask"), AssFile::COMMIT_DIAG_ADDREM);
 	c->selectionController->SetSelectionAndActive({created}, created);
 	points = new_points;
 	parent->Render();
@@ -276,7 +276,7 @@ void VisualToolScreenMask::CreateMask(std::vector<ass::screen_mask::Point> const
 void VisualToolScreenMask::UpdateMask() {
 	if (!active_line || active_line->Effect.get() != SCREEN_MASK_EFFECT || points.size() < 3) return;
 	active_line->Text = ass::screen_mask::UpdateGeometry(active_line->Text.get(), points);
-	Commit(_("调整画面遮罩"));
+	Commit(_("Adjust screen mask"));
 }
 
 void VisualToolScreenMask::DoRefresh() {

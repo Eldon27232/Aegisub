@@ -7,6 +7,7 @@
 #include "ass_template_store.h"
 
 #include "ass_override_ast.h"
+#include "format.h"
 
 #include <libaegisub/ass/string_codec.h>
 
@@ -17,37 +18,44 @@
 namespace ass::templates {
 namespace {
 
+std::string translated(wxString const& value) {
+	return std::string(wxGetTranslation(value).utf8_str());
+}
+
 std::string tag_label(std::string_view name) {
-	static const std::map<std::string_view, std::string_view> labels = {
-		{"\\an", "原点/对齐"}, {"\\pos", "位置"}, {"\\move", "移动"}, {"\\org", "旋转原点"},
-		{"\\fn", "字体"}, {"\\fs", "字号"}, {"\\fsp", "字距"},
-		{"\\fscx", "X 缩放"}, {"\\fscy", "Y 缩放"}, {"\\frx", "X 轴旋转"},
-		{"\\fry", "Y 轴旋转"}, {"\\frz", "Z 轴旋转"}, {"\\fax", "X 轴倾斜"}, {"\\fay", "Y 轴倾斜"},
-		{"\\c", "正文颜色"}, {"\\1c", "正文颜色"}, {"\\2c", "次要颜色"},
-		{"\\3c", "描边颜色"}, {"\\4c", "阴影颜色"}, {"\\alpha", "全局透明度"},
-		{"\\1a", "正文透明度"}, {"\\2a", "次要透明度"}, {"\\3a", "描边透明度"}, {"\\4a", "阴影透明度"},
-		{"\\bord", "描边"}, {"\\xbord", "X 描边"}, {"\\ybord", "Y 描边"},
-		{"\\shad", "阴影"}, {"\\xshad", "X 阴影"}, {"\\yshad", "Y 阴影"},
-		{"\\blur", "模糊"}, {"\\be", "边缘模糊"}, {"\\t", "动画"},
-		{"\\fad", "淡入淡出"}, {"\\fade", "高级淡入淡出"},
-		{"\\clip", "裁剪"}, {"\\iclip", "反向裁剪"}, {"\\p", "Drawing 模式"}, {"\\pbo", "Drawing 基线"},
-		{"\\k", "Karaoke"}, {"\\K", "Karaoke"}, {"\\kf", "Karaoke 填充"}, {"\\ko", "Karaoke 描边"}, {"\\kt", "Karaoke 时间"}
+	static const std::map<std::string_view, wxString> labels = {
+		{"\\an", wxTRANSLATE("Anchor/Alignment")}, {"\\pos", wxTRANSLATE("Position")}, {"\\move", wxTRANSLATE("Move")}, {"\\org", wxTRANSLATE("Rotation origin")},
+		{"\\fn", wxTRANSLATE("Font")}, {"\\fs", wxTRANSLATE("Font size")}, {"\\fsp", wxTRANSLATE("Character spacing")},
+		{"\\fscx", wxTRANSLATE("X scale")}, {"\\fscy", wxTRANSLATE("Y scale")}, {"\\frx", wxTRANSLATE("X rotation")},
+		{"\\fry", wxTRANSLATE("Y rotation")}, {"\\frz", wxTRANSLATE("Z rotation")}, {"\\fax", wxTRANSLATE("X shear")}, {"\\fay", wxTRANSLATE("Y shear")},
+		{"\\c", wxTRANSLATE("Primary color")}, {"\\1c", wxTRANSLATE("Primary color")}, {"\\2c", wxTRANSLATE("Secondary color")},
+		{"\\3c", wxTRANSLATE("Outline color")}, {"\\4c", wxTRANSLATE("Shadow color")}, {"\\alpha", wxTRANSLATE("Global opacity")},
+		{"\\1a", wxTRANSLATE("Primary opacity")}, {"\\2a", wxTRANSLATE("Secondary opacity")}, {"\\3a", wxTRANSLATE("Outline opacity")}, {"\\4a", wxTRANSLATE("Shadow opacity")},
+		{"\\bord", wxTRANSLATE("Outline")}, {"\\xbord", wxTRANSLATE("X outline")}, {"\\ybord", wxTRANSLATE("Y outline")},
+		{"\\shad", wxTRANSLATE("Shadow")}, {"\\xshad", wxTRANSLATE("X shadow")}, {"\\yshad", wxTRANSLATE("Y shadow")},
+		{"\\blur", wxTRANSLATE("Blur")}, {"\\be", wxTRANSLATE("Edge blur")}, {"\\t", wxTRANSLATE("Animation")},
+		{"\\fad", wxTRANSLATE("Fade")}, {"\\fade", wxTRANSLATE("Advanced fade")},
+		{"\\clip", wxTRANSLATE("Clip")}, {"\\iclip", wxTRANSLATE("Inverse clip")}, {"\\p", wxTRANSLATE("Drawing mode")}, {"\\pbo", wxTRANSLATE("Drawing baseline")},
+		{"\\k", wxTRANSLATE("Karaoke")}, {"\\K", wxTRANSLATE("Karaoke")}, {"\\kf", wxTRANSLATE("Karaoke fill")}, {"\\ko", wxTRANSLATE("Karaoke outline")}, {"\\kt", wxTRANSLATE("Karaoke timing")}
 	};
 	auto it = labels.find(name);
-	return it == labels.end() ? std::string(name) : std::string(it->second);
+	return it == labels.end() ? std::string(name) : translated(it->second);
 }
 
 std::string argument_label(std::string_view name, size_t argument, size_t count) {
 	auto base = tag_label(name);
 	if (name == "\\pos" || name == "\\org") return base + (argument == 0 ? " X" : " Y");
 	if (name == "\\move") {
-		static constexpr std::string_view labels[] = {"起点 X", "起点 Y", "终点 X", "终点 Y", "开始时间", "结束时间"};
-		if (argument < std::size(labels)) return base + " " + std::string(labels[argument]);
+		static const std::string labels[] = {
+			translated(_("Start X")), translated(_("Start Y")), translated(_("End X")),
+			translated(_("End Y")), translated(_("Start time")), translated(_("End time"))
+		};
+		if (argument < std::size(labels)) return base + " " + labels[argument];
 	}
-	if (name == "\\fad") return base + (argument == 0 ? " 淡入" : " 淡出");
-	if (name == "\\t") return base + " 时间/加速 " + std::to_string(argument + 1);
+	if (name == "\\fad") return base + " " + translated(argument == 0 ? _("Fade in") : _("Fade out"));
+	if (name == "\\t") return base + " " + translated(_("Time/acceleration")) + " " + std::to_string(argument + 1);
 	if (count == 1) return base;
-	return base + " 参数 " + std::to_string(argument + 1);
+	return base + " " + translated(_("Parameter")) + " " + std::to_string(argument + 1);
 }
 
 void extract_block(ast::OverrideBlock const& block, std::vector<Parameter>& output,
@@ -145,7 +153,7 @@ std::vector<Parameter> ExtractParameters(std::string_view source) {
 		if (segment.Kind() == ast::SegmentKind::Override && segment.Block())
 			extract_block(*segment.Block(), result, occurrences);
 		else if (segment.Kind() == ast::SegmentKind::Text && !segment.Text().empty()) {
-			result.push_back({"text:" + std::to_string(text_index), "正文 " + std::to_string(text_index + 1), segment.Text()});
+			result.push_back({"text:" + std::to_string(text_index), translated(_("Text")) + " " + std::to_string(text_index + 1), segment.Text()});
 			++text_index;
 		}
 	}
