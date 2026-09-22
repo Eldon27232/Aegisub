@@ -135,29 +135,7 @@ struct GridColumnFolds final : GridColumn {
 	bool Centered() const override { return false; }
 
 	wxString Value(const AssDialogue *d, const agi::Context *) const override {
-		std::string value;
-		if (d->Fold.hasFold()) {
-			if (!d->Fold.isEnd()) {
-				value = d->Fold.isFolded() ? ">" : "v";
-			} else if (!d->Fold.isFolded()) {
-				value = "-";
-			}
-			while (d->Fold.getFoldOpener()) {
-				d = d->Fold.getFoldOpener();
-				value = " " + value;
-			}
-		}
-		return " " + value;
-	}
-
-	bool OnMouseEvent(AssDialogue *d, agi::Context *c, wxMouseEvent &event) const override {
-		if ((event.LeftDown() || event.LeftDClick()) && !event.ShiftDown() && !event.CmdDown() && !event.AltDown()) {
-			if (d->Fold.hasFold() && !d->Fold.isEnd()) {
-				c->foldController->ToggleFoldsAt({d});
-				return true;
-			}
-		}
-		return false;
+		return d->Fold.hasFold() || d->Fold.getFoldOpener() ? wxString::FromUTF8("└") : wxString();
 	}
 
 	int Width(const agi::Context *c, WidthHelper &helper) const override {
@@ -219,8 +197,6 @@ struct GridColumnEndTime final : GridColumnTime {
 	COLUMN_DESCRIPTION(_("End Time"))
 
 	wxString Value(const AssDialogue *d, const agi::Context *c) const override {
-		if (d->Fold.hasFold() && !d->Fold.isEnd() && d->Fold.isFolded() && d->Fold.getFoldCounterpart())
-			d = d->Fold.getFoldCounterpart();
 		if (by_frame)
 			return std::to_wstring(c->videoController->FrameAtTime(d->End, agi::vfr::END));
 		return to_wx(d->End.GetAssFormatted());

@@ -19,7 +19,6 @@
 #include "ass_file.h"
 #include "include/aegisub/context.h"
 #include "format.h"
-#include "subs_controller.h"
 
 #include <algorithm>
 #include <unordered_map>
@@ -30,8 +29,12 @@
 const char *folds_key = "_aegi_folddata";
 
 FoldController::FoldController(agi::Context *c)
-: context(c)
-, pre_commit_listener(c->ass->AddPreCommitListener(&FoldController::FixFoldsPreCommit, this))
+: FoldController(c->ass.get())
+{ }
+
+FoldController::FoldController(AssFile *file)
+: file(file)
+, pre_commit_listener(file->AddPreCommitListener(&FoldController::FixFoldsPreCommit, this))
 { }
 
 
@@ -40,7 +43,7 @@ bool FoldController::CanAddFold(AssDialogue& start, AssDialogue& end) {
 		return false;
 	}
 	int folddepth = 0;
-	for (auto it = std::next(context->ass->Events.begin(), start.Row); it->Row < end.Row; it++) {
+	for (auto it = std::next(file->Events.begin(), start.Row); it->Row < end.Row; it++) {
 		if (it->Fold.valid) {
 			folddepth += it->Fold.side ? -1 : 1;
 		}
@@ -53,15 +56,15 @@ bool FoldController::CanAddFold(AssDialogue& start, AssDialogue& end) {
 
 void FoldController::RawAddFold(AssDialogue& start, AssDialogue& end, bool collapsed) {
 	int id = ++max_fold_id;
-	context->ass->SetExtradataValue(start, folds_key, agi::format("0;%d;%d", int(collapsed), id));
-	context->ass->SetExtradataValue(end, folds_key, agi::format("1;%d;%d", int(collapsed), id));
+	file->SetExtradataValue(start, folds_key, agi::format("0;%d;%d", int(collapsed), id));
+	file->SetExtradataValue(end, folds_key, agi::format("1;%d;%d", int(collapsed), id));
 }
 
 void FoldController::UpdateLineExtradata(AssDialogue &line) {
 	if (line.Fold.extraExists)
-		context->ass->SetExtradataValue(line, folds_key, agi::format("%d;%d;%d", int(line.Fold.side), int(line.Fold.collapsed), int(line.Fold.id)));
+		file->SetExtradataValue(line, folds_key, agi::format("%d;%d;%d", int(line.Fold.side), int(line.Fold.collapsed), int(line.Fold.id)));
 	else
-		context->ass->DeleteExtradataValue(line, folds_key);
+		file->DeleteExtradataValue(line, folds_key);
 }
 
 void FoldController::InvalidateLineFold(AssDialogue &line) {
@@ -75,7 +78,7 @@ void FoldController::InvalidateLineFold(AssDialogue &line) {
 void FoldController::AddFold(AssDialogue& start, AssDialogue& end, bool collapsed) {
 	if (CanAddFold(start, end)) {
 		RawAddFold(start, end, collapsed);
-		context->ass->Commit(_("add fold"), AssFile::COMMIT_FOLD);
+		file->Commit(_("add fold"), AssFile::COMMIT_FOLD);
 	}
 }
 
@@ -97,7 +100,7 @@ std::vector<AssDialogue *> FoldController::GetFoldLines(AssDialogue& line) const
 
 	std::vector<AssDialogue *> result;
 	auto end = opener->Fold.counterpart;
-	for (auto it = context->ass->iterator_to(*opener); it != context->ass->Events.end(); ++it) {
+	for (auto it = file->iterator_to(*opener); it != file->Events.end(); ++it) {
 		result.push_back(&*it);
 		if (&*it == end) break;
 	}
@@ -107,7 +110,7 @@ std::vector<AssDialogue *> FoldController::GetFoldLines(AssDialogue& line) const
 void FoldController::MergeIntoFlatGroup(std::vector<AssDialogue *> const& lines) {
 	if (lines.size() < 2) return;
 
-	int first = context->ass->Events.size();
+	int first = file->Events.size();
 	int last = -1;
 	for (auto *line : lines) {
 		if (!line) continue;
@@ -122,7 +125,7 @@ void FoldController::MergeIntoFlatGroup(std::vector<AssDialogue *> const& lines)
 	bool expanded;
 	do {
 		expanded = false;
-		for (auto& line : context->ass->Events) {
+		for (auto& line : file->Events) {
 			if (line.Row < first || line.Row > last) continue;
 			auto group = GetFoldLines(line);
 			int next_first = std::min(first, group.front()->Row);
@@ -135,15 +138,15 @@ void FoldController::MergeIntoFlatGroup(std::vector<AssDialogue *> const& lines)
 
 	AssDialogue *start = nullptr;
 	AssDialogue *end = nullptr;
-	for (auto& line : context->ass->Events) {
+	for (auto& line : file->Events) {
 		if (line.Row < first || line.Row > last) continue;
 		if (!start) start = &line;
 		end = &line;
-		context->ass->DeleteExtradataValue(line, folds_key);
+		file->DeleteExtradataValue(line, folds_key);
 	}
 	if (!start || !end || start == end) return;
 	RawAddFold(*start, *end, true);
-	context->ass->Commit(_("Merge logical subtitle group"), AssFile::COMMIT_FOLD);
+	file->Commit(_("Merge logical subtitle group"), AssFile::COMMIT_FOLD);
 }
 
 void FoldController::ReleaseLineFromFold(AssDialogue& line) {
@@ -155,18 +158,18 @@ void FoldController::ReleaseLineFromFold(AssDialogue& line) {
 	bool collapsed = group.front()->Fold.collapsed;
 
 	for (auto *member : group)
-		context->ass->DeleteExtradataValue(*member, folds_key);
+		file->DeleteExtradataValue(*member, folds_key);
 
 	if (released >= 2)
 		RawAddFold(*group.front(), *group[released - 1], collapsed);
 	if (group.size() - released - 1 >= 2)
 		RawAddFold(*group[released + 1], *group.back(), collapsed);
 
-	context->ass->Commit(_("Release current line from logical subtitle group"), AssFile::COMMIT_FOLD);
+	file->Commit(_("Release current line from logical subtitle group"), AssFile::COMMIT_FOLD);
 }
 
 void FoldController::DoForAllFolds(std::function<void(AssDialogue&)> action) {
-	for (AssDialogue& line : context->ass->Events) {
+	for (AssDialogue& line : file->Events) {
 		if (line.Fold.valid) {
 			action(line);
 			UpdateLineExtradata(line);
@@ -208,10 +211,10 @@ void FoldController::UpdateFoldInfo() {
 void FoldController::ReadFromExtradata() {
 	max_fold_id = 0;
 
-	for (auto line = context->ass->Events.begin(); line != context->ass->Events.end(); line++) {
+	for (auto line = file->Events.begin(); line != file->Events.end(); line++) {
 		line->Fold.extraExists = false;
 
-		for (auto const& extra : context->ass->GetExtradata(line->ExtradataIds)) {
+		for (auto const& extra : file->GetExtradata(line->ExtradataIds)) {
 			if (extra.key == folds_key) {
 				std::vector<std::string> fields;
 				agi::Split(fields, extra.value, ';');
@@ -251,7 +254,7 @@ void FoldController::FixFolds() {
 	// Once some fold has been completely found, subsequent markers found with the same id will be mapped to this new id.
 	std::unordered_map<int, int> idRemap;
 
-	for (auto line = context->ass->Events.begin(); line != context->ass->Events.end(); line++) {
+	for (auto line = file->Events.begin(); line != file->Events.end(); line++) {
 		if (line->Fold.extraExists) {
 			bool needs_update = false;
 
@@ -334,30 +337,12 @@ void FoldController::FixFolds() {
 
 void FoldController::LinkFolds() {
 	std::vector<AssDialogue *> foldStack;
-	AssDialogue *lastVisible = nullptr;
-
 	maxdepth = 0;
-
-	int visibleRow = 0;
-	int highestFolded = 1;
-	for (auto line = context->ass->Events.begin(); line != context->ass->Events.end(); line++) {
+	for (auto line = file->Events.begin(); line != file->Events.end(); line++) {
 		line->Fold.parent = foldStack.empty() ? nullptr : foldStack.back();
-		line->Fold.nextVisible = nullptr;
-		line->Fold.visible = highestFolded > (int) foldStack.size();
-		line->Fold.visibleRow = visibleRow;
-
-		if (line->Fold.visible) {
-			if (lastVisible != nullptr) {
-				lastVisible->Fold.nextVisible = &*line;
-			}
-			lastVisible = &*line;
-			visibleRow++;
-		}
+		line->Fold.counterpart = nullptr;
 		if (line->Fold.valid && !line->Fold.side) {
 			foldStack.push_back(&*line);
-			if (!line->Fold.collapsed && highestFolded == (int) foldStack.size()) {
-				highestFolded++;
-			}
 			if ((int) foldStack.size() > maxdepth) {
 				maxdepth = foldStack.size();
 			}
@@ -366,13 +351,38 @@ void FoldController::LinkFolds() {
 			line->Fold.counterpart = foldStack.back();
 			(*foldStack.rbegin())->Fold.counterpart = &*line;
 
-			if (highestFolded >= (int) foldStack.size()) {
-				highestFolded = foldStack.size();
-			}
-
 			foldStack.pop_back();
 		}
 	}
+
+	GetDisplayRows();
+}
+
+std::vector<FoldDisplayRow> const& FoldController::GetDisplayRows() {
+	// A view has a logical header followed by every real subtitle when open,
+	// or only its header when closed. Headers never become ASS events.
+	display_rows.clear();
+	int hidden_through = -1;
+	int hidden_header = -1;
+	for (auto& line : file->Events) {
+		if (line.Row <= hidden_through) {
+			line.Fold.visibleRow = hidden_header;
+			continue;
+		}
+		if (line.Fold.valid && !line.Fold.side) {
+			int header = static_cast<int>(display_rows.size());
+			display_rows.push_back({&line, true});
+			if (line.Fold.collapsed) {
+				hidden_through = line.Fold.counterpart->Row;
+				hidden_header = header;
+				line.Fold.visibleRow = header;
+				continue;
+			}
+		}
+		line.Fold.visibleRow = static_cast<int>(display_rows.size());
+		display_rows.push_back({&line, false});
+	}
+	return display_rows;
 }
 
 int FoldController::GetMaxDepth() {
@@ -384,21 +394,21 @@ void FoldController::ClearAllFolds() {
 	DoForAllFolds([&](AssDialogue &line) {
 		line.Fold.extraExists = false; line.Fold.valid = false;
 	});
-	context->ass->Commit(_("clear all folds"), AssFile::COMMIT_FOLD);
+	file->Commit(_("clear all folds"), AssFile::COMMIT_FOLD);
 }
 
 void FoldController::OpenAllFolds() {
 	DoForAllFolds([&](AssDialogue &line) {
 		line.Fold.collapsed = false;
 	});
-	context->ass->Commit(_("open all folds"), AssFile::COMMIT_FOLD);
+	file->Commit(_("open all folds"), AssFile::COMMIT_FOLD);
 }
 
 void FoldController::CloseAllFolds() {
 	DoForAllFolds([&](AssDialogue &line) {
 		line.Fold.collapsed = true;
 	});
-	context->ass->Commit(_("close all folds"), AssFile::COMMIT_FOLD);
+	file->Commit(_("close all folds"), AssFile::COMMIT_FOLD);
 }
 
 bool FoldController::HasFolds() {
@@ -418,7 +428,7 @@ void FoldController::ClearFoldsAt(std::vector<AssDialogue *> const& lines) {
 			UpdateLineExtradata(*line.Fold.counterpart);
 		}
 	});
-	context->ass->Commit(_("clear folds"), AssFile::COMMIT_FOLD);
+	file->Commit(_("clear folds"), AssFile::COMMIT_FOLD);
 }
 
 void FoldController::OpenFoldsAt(std::vector<AssDialogue *> const& lines) {
@@ -427,7 +437,7 @@ void FoldController::OpenFoldsAt(std::vector<AssDialogue *> const& lines) {
 		if (line.Fold.counterpart)
 			line.Fold.counterpart->Fold.collapsed = line.Fold.collapsed;
 	});
-	context->ass->Commit(_("open folds"), AssFile::COMMIT_FOLD);
+	file->Commit(_("open folds"), AssFile::COMMIT_FOLD);
 }
 
 void FoldController::CloseFoldsAt(std::vector<AssDialogue *> const& lines) {
@@ -436,7 +446,7 @@ void FoldController::CloseFoldsAt(std::vector<AssDialogue *> const& lines) {
 		if (line.Fold.counterpart)
 			line.Fold.counterpart->Fold.collapsed = line.Fold.collapsed;
 	});
-	context->ass->Commit(_("close folds"), AssFile::COMMIT_FOLD);
+	file->Commit(_("close folds"), AssFile::COMMIT_FOLD);
 }
 
 void FoldController::ToggleFoldsAt(std::vector<AssDialogue *> const& lines) {
@@ -445,7 +455,7 @@ void FoldController::ToggleFoldsAt(std::vector<AssDialogue *> const& lines) {
 		if (line.Fold.counterpart)
 			line.Fold.counterpart->Fold.collapsed = line.Fold.collapsed;
 	});
-	context->ass->Commit(_("toggle folds"), AssFile::COMMIT_FOLD);
+	file->Commit(_("toggle folds"), AssFile::COMMIT_FOLD);
 }
 
 bool FoldController::AreFoldsAt(std::vector<AssDialogue *> const& lines) {

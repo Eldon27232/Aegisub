@@ -56,25 +56,18 @@ class FoldInfo {
 	/// False if a fold is started here, true otherwise.
 	bool side = false;
 
-	/// Whether the line is currently visible
-	bool visible = true;
-
 	/// If exists is true, this is a pointer to the other line with the given fold id
 	AssDialogue *counterpart = nullptr;
 	/// A pointer to the opener of the innermost fold containing the line, if one exists.
 	/// If the line starts a fold, this points to the next bigger fold.
 	AssDialogue *parent = nullptr;
-	/// If this line is visible, this points to the next visible line, if one exists
-	AssDialogue *nextVisible = nullptr;
-
 	/// Increased when there's an extradata entry in here that turned out to be invalid.
 	/// Once this hits some threshold, the extradata entry is deleted.
 	/// We don't delete it immediately to allow cut/pasting fold delimiters around.
 	int invalidCount = 0;
 
-	/// The row number where this line would appear in the subtitle grid. That is, the ordinary
-	/// Row value, but with hidden lines skipped.
-	/// Out of all AssDialogue lines with the same visibleRow, only the one with the lowest Row is shown.
+	/// The display row of this physical subtitle, or the logical header hiding it.
+	/// Display rows also contain pure UI group headers, which are never ASS events.
 	int visibleRow = -1;
 
 	friend class FoldController;
@@ -88,14 +81,21 @@ public:
 	// Their behaviour is undefined as soon as any uncommitted change is made to the Events.
 	AssDialogue *getFoldOpener() const { return parent; }
 	AssDialogue *getFoldCounterpart() const { return counterpart; }
-	AssDialogue *getNextVisible() const { return nextVisible; }
 	int getVisibleRow() const { return visibleRow; }
 };
 
 #include "ass_dialogue.h"
 
+/// A grid-only row. A header references its first member, but is not itself an
+/// AssDialogue and is never inserted into AssFile::Events or exported.
+struct FoldDisplayRow {
+	AssDialogue *line;
+	bool group_header = false;
+};
+
 class FoldController {
-	agi::Context *context;
+	AssFile *file;
+	std::vector<FoldDisplayRow> display_rows;
 	agi::signal::Connection pre_commit_listener;
 	int maxdepth = 0;
 	int max_fold_id = 0;
@@ -133,6 +133,9 @@ class FoldController {
 
 public:
 	FoldController(agi::Context *context);
+	explicit FoldController(AssFile *file);
+
+	std::vector<FoldDisplayRow> const& GetDisplayRows();
 
 	int GetMaxDepth();
 
