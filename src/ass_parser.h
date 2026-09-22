@@ -17,25 +17,40 @@
 
 class AssAttachment;
 class AssFile;
+enum class AssFileSection;
 
 class AssParser {
+	enum class ParsedLine {
+		RAW,
+		SCRIPT_INFO,
+		PROJECT_PROPERTY,
+		STYLE,
+		EVENT,
+		ATTACHMENT,
+		EXTRADATA,
+		CONSUMED
+	};
+
 	class HeaderToProperty;
 	std::unique_ptr<HeaderToProperty> property_handler;
 
 	AssFile *target;
 	int version;
 	std::unique_ptr<AssAttachment> attach;
-	void (AssParser::*state)(std::string const&);
+	ParsedLine (AssParser::*state)(std::string const&);
+	AssFileSection section;
+	std::string parsed_key;
+	std::string parsed_value;
 
-	void ParseAttachmentLine(std::string const& data);
-	void ParseEventLine(std::string const& data);
-	void ParseStyleLine(std::string const& data);
-	void ParseScriptInfoLine(std::string const& data);
-	void ParseMetadataLine(std::string const& data);
-	void ParseFontLine(std::string const& data);
-	void ParseGraphicsLine(std::string const& data);
-	void ParseExtradataLine(std::string const &data);
-	void UnknownLine(std::string const&) { }
+	ParsedLine ParseAttachmentLine(std::string const& data);
+	ParsedLine ParseEventLine(std::string const& data);
+	ParsedLine ParseStyleLine(std::string const& data);
+	ParsedLine ParseScriptInfoLine(std::string const& data);
+	ParsedLine ParseMetadataLine(std::string const& data);
+	ParsedLine ParseFontLine(std::string const& data);
+	ParsedLine ParseGraphicsLine(std::string const& data);
+	ParsedLine ParseExtradataLine(std::string const &data);
+	ParsedLine UnknownLine(std::string const&) { return ParsedLine::RAW; }
 
 	std::string SanitizeLine(std::string const& data);
 public:

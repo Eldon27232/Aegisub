@@ -13,15 +13,19 @@ tests_deps = [
 
 tests_src = [
     'support/main.cpp',
+    'support/ass_file_test_stubs.cpp',
     'support/util.cpp',
 
     'tests/access.cpp',
+    'tests/ass_file_roundtrip.cpp',
+    'tests/ass_override_ast.cpp',
     'tests/audio.cpp',
     'tests/cajun.cpp',
     'tests/calltip_provider.cpp',
     'tests/character_count.cpp',
     'tests/charset.cpp',
     'tests/color.cpp',
+    'tests/colour_picker_model.cpp',
     'tests/dialogue_lexer.cpp',
     'tests/format.cpp',
     'tests/fs.cpp',
@@ -50,7 +54,22 @@ tests_src = [
     'tests/ycbcr.cpp',
 ]
 
-tests_src += files('../src/theme_palette.cpp')
+tests_src += files(
+    '../src/ass_attachment.cpp',
+    '../src/ass_dialogue.cpp',
+    '../src/ass_entry.cpp',
+    '../src/ass_file.cpp',
+    '../src/ass_override.cpp',
+    '../src/ass_override_ast.cpp',
+    '../src/ass_parser.cpp',
+    '../src/ass_style.cpp',
+    '../src/colour_picker_model.cpp',
+    '../src/subtitle_format_ass.cpp',
+    '../src/text_file_reader.cpp',
+    '../src/text_file_writer.cpp',
+    '../src/theme_palette.cpp',
+    '../src/version.cpp',
+)
 
 tests_inc = include_directories('support', '../src')
 
@@ -66,6 +85,7 @@ endif
 runner = executable(
     'gtest-main',
     tests_src,
+    version_h,
     include_directories: [tests_inc, libaegisub_inc],
     dependencies: [tests_deps, deps],
     cpp_args: tests_args + conf_defines,

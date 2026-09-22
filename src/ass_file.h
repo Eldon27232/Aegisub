@@ -85,6 +85,48 @@ struct ProjectProperties {
 	int video_position = 0;
 };
 
+/// Section containing a line from the original ASS file.
+///
+/// This is deliberately separate from AssEntryGroup: project metadata and
+/// unknown sections do not have AssEntry objects, but still need to retain
+/// their position when an ASS file is saved again.
+enum class AssFileSection {
+	NONE,
+	SCRIPT_INFO,
+	STYLES,
+	EVENTS,
+	PROJECT,
+	EXTRADATA,
+	FONTS,
+	GRAPHICS,
+	UNKNOWN
+};
+
+/// Meaning of a line retained from the original ASS file.
+enum class AssFilePassthroughType {
+	RAW,
+	SECTION,
+	SCRIPT_INFO,
+	PROJECT_PROPERTY,
+	STYLE,
+	EVENT,
+	ATTACHMENT,
+	EXTRADATA
+};
+
+/// A line-level record of the input file used for lossless passthrough.
+///
+/// RAW lines are written back verbatim. Structured lines are placeholders:
+/// the writer emits the current value from AssFile at the same position, or
+/// the original spelling when the parsed value has not changed.
+struct AssFilePassthroughLine {
+	AssFilePassthroughType type = AssFilePassthroughType::RAW;
+	AssFileSection section = AssFileSection::NONE;
+	std::string raw;
+	std::string key;
+	std::string original_value;
+};
+
 class AssFile {
 	/// A set of changes has been committed to the file (AssFile::COMMITType)
 	agi::signal::Signal<int, const AssDialogue*> AnnounceCommit;
@@ -100,6 +142,7 @@ public:
 	std::vector<AssAttachment> Attachments;
 	std::vector<ExtradataEntry> Extradata;
 	ProjectProperties Properties;
+	std::vector<AssFilePassthroughLine> Passthrough;
 
 	uint32_t next_extradata_id = 0;
 
