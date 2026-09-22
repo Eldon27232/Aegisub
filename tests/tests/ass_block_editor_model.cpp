@@ -95,11 +95,39 @@ TEST(ass_block_editor_model, reparses_direct_source_edits_into_blocks) {
 	EXPECT_EQ(Origin::Manual, model.Items()[2].origin);
 }
 
-TEST(ass_block_editor_model, stored_source_without_valid_ownership_stays_manual_and_opaque) {
-	std::string source = "手写 \\n \\N {\\pos(114,514)} {invalid";
+TEST(ass_block_editor_model, unmarked_existing_source_takes_over_recognized_ass_tags) {
+	std::string source = "{\\pos(114,514)\\vendor(x)}正文\\n\\N";
 	Model model;
 	model.SetStoredSource(source, {});
 
+	ASSERT_EQ(3u, model.Items().size());
+	EXPECT_EQ(ItemKind::Tag, model.Items()[0].kind);
+	EXPECT_EQ(Origin::Gui, model.Items()[0].origin);
+	EXPECT_EQ("\\pos(114,514)", model.Items()[0].source);
+	EXPECT_EQ(ItemKind::Raw, model.Items()[1].kind);
+	EXPECT_EQ(Origin::Raw, model.Items()[1].origin);
+	EXPECT_EQ(ItemKind::Text, model.Items()[2].kind);
+	EXPECT_EQ(Origin::Manual, model.Items()[2].origin);
+	EXPECT_EQ("正文\\n\\N", model.Items()[2].source);
+	EXPECT_EQ(source, model.Serialize());
+
+	Model reopened;
+	reopened.SetStoredSource(source, model.OriginMetadata());
+	EXPECT_EQ(source, reopened.Serialize());
+	ASSERT_EQ(3u, reopened.Items().size());
+	EXPECT_EQ(Origin::Gui, reopened.Items()[0].origin);
+	EXPECT_EQ(Origin::Raw, reopened.Items()[1].origin);
+	EXPECT_EQ(Origin::Manual, reopened.Items()[2].origin);
+}
+
+TEST(ass_block_editor_model, marked_manual_source_stays_opaque_after_reopening) {
+	std::string source = "手写 \\n \\N {\\pos(114,514)} {invalid";
+	Model authored;
+	authored.SetStoredSource("", {});
+	ASSERT_TRUE(authored.ReplaceManual(0, source));
+
+	Model model;
+	model.SetStoredSource(source, authored.OriginMetadata());
 	ASSERT_EQ(1u, model.Items().size());
 	EXPECT_EQ(ItemKind::Text, model.Items()[0].kind);
 	EXPECT_EQ(Origin::Manual, model.Items()[0].origin);
