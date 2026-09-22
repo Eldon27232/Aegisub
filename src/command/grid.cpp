@@ -400,9 +400,9 @@ struct grid_swap final : public Command {
 
 struct grid_fold_create final : public Command {
 	CMD_NAME("grid/fold/create")
-	STR_MENU("合并为逻辑字幕组")
-	STR_DISP("合并为逻辑字幕组")
-	STR_HELP("把选中的普通字幕和已有字幕组合并成一个扁平逻辑组")
+	STR_MENU("Merge into logical subtitle group")
+	STR_DISP("Merge into logical subtitle group")
+	STR_HELP("Merge selected subtitles and existing groups into one flat logical group")
 	CMD_TYPE(COMMAND_VALIDATE)
 
 	bool Validate(const agi::Context *c) override {
@@ -421,9 +421,9 @@ struct grid_fold_create final : public Command {
 
 struct grid_fold_open final : public Command {
 	CMD_NAME("grid/fold/open")
-	STR_MENU("展开逻辑字幕组")
-	STR_DISP("展开逻辑字幕组")
-	STR_HELP("展开所选字幕所在的逻辑组")
+	STR_MENU("Expand logical subtitle group")
+	STR_DISP("Expand logical subtitle group")
+	STR_HELP("Expand the logical group containing the selected subtitle")
 	CMD_TYPE(COMMAND_VALIDATE)
 
 	bool Validate(const agi::Context *c) override {
@@ -437,9 +437,9 @@ struct grid_fold_open final : public Command {
 
 struct grid_fold_close final : public Command {
 	CMD_NAME("grid/fold/close")
-	STR_MENU("收起逻辑字幕组")
-	STR_DISP("收起逻辑字幕组")
-	STR_HELP("收起所选字幕所在的逻辑组")
+	STR_MENU("Collapse logical subtitle group")
+	STR_DISP("Collapse logical subtitle group")
+	STR_HELP("Collapse the logical group containing the selected subtitle")
 	CMD_TYPE(COMMAND_VALIDATE)
 
 	bool Validate(const agi::Context *c) override {
@@ -453,9 +453,9 @@ struct grid_fold_close final : public Command {
 
 struct grid_fold_clear final : public Command {
 	CMD_NAME("grid/fold/clear")
-	STR_MENU("释放整个逻辑字幕组")
-	STR_DISP("释放整个逻辑字幕组")
-	STR_HELP("保留实际 ASS 字幕行，只移除编辑器中的逻辑分组")
+	STR_MENU("Release entire logical subtitle group")
+	STR_DISP("Release entire logical subtitle group")
+	STR_HELP("Keep the actual ASS subtitle lines and remove only the editor grouping")
 	CMD_TYPE(COMMAND_VALIDATE)
 
 	bool Validate(const agi::Context *c) override {
@@ -469,9 +469,9 @@ struct grid_fold_clear final : public Command {
 
 struct grid_fold_toggle final : public Command {
 	CMD_NAME("grid/fold/toggle")
-	STR_MENU("展开 / 收起逻辑字幕组")
-	STR_DISP("展开 / 收起逻辑字幕组")
-	STR_HELP("切换所选字幕所在逻辑组的展开状态")
+	STR_MENU("Expand / Collapse logical subtitle group")
+	STR_DISP("Expand / Collapse logical subtitle group")
+	STR_HELP("Toggle the logical group containing the selected subtitle")
 	CMD_TYPE(COMMAND_VALIDATE)
 
 	bool Validate(const agi::Context *c) override {
@@ -485,9 +485,9 @@ struct grid_fold_toggle final : public Command {
 
 struct grid_group_select final : public Command {
 	CMD_NAME("grid/group/select")
-	STR_MENU("选择整个逻辑字幕组")
-	STR_DISP("选择整个逻辑字幕组")
-	STR_HELP("选择当前字幕所在逻辑组的全部实际字幕行")
+	STR_MENU("Select entire logical subtitle group")
+	STR_DISP("Select entire logical subtitle group")
+	STR_HELP("Select all actual subtitle lines in the current logical group")
 	CMD_TYPE(COMMAND_VALIDATE)
 
 	bool Validate(const agi::Context *c) override {
@@ -505,9 +505,9 @@ struct grid_group_select final : public Command {
 
 struct grid_group_release_line final : public Command {
 	CMD_NAME("grid/group/release_line")
-	STR_MENU("从逻辑组释放当前字幕")
-	STR_DISP("从逻辑组释放当前字幕")
-	STR_HELP("只释放当前实际字幕行，必要时把左右剩余部分保留为两个扁平组")
+	STR_MENU("Release current subtitle from logical group")
+	STR_DISP("Release current subtitle from logical group")
+	STR_HELP("Release only the current subtitle line and keep the remaining sides as flat groups when possible")
 	CMD_TYPE(COMMAND_VALIDATE)
 
 	bool Validate(const agi::Context *c) override {

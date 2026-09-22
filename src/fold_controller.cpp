@@ -143,7 +143,7 @@ void FoldController::MergeIntoFlatGroup(std::vector<AssDialogue *> const& lines)
 	}
 	if (!start || !end || start == end) return;
 	RawAddFold(*start, *end, true);
-	context->ass->Commit(_("合并逻辑字幕组"), AssFile::COMMIT_FOLD);
+	context->ass->Commit(_("Merge logical subtitle group"), AssFile::COMMIT_FOLD);
 }
 
 void FoldController::ReleaseLineFromFold(AssDialogue& line) {
@@ -162,7 +162,7 @@ void FoldController::ReleaseLineFromFold(AssDialogue& line) {
 	if (group.size() - released - 1 >= 2)
 		RawAddFold(*group[released + 1], *group.back(), collapsed);
 
-	context->ass->Commit(_("从逻辑字幕组释放当前行"), AssFile::COMMIT_FOLD);
+	context->ass->Commit(_("Release current line from logical subtitle group"), AssFile::COMMIT_FOLD);
 }
 
 void FoldController::DoForAllFolds(std::function<void(AssDialogue&)> action) {

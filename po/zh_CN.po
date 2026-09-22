@@ -7065,3 +7065,812 @@ msgstr ""
 
 #~ msgid "Drawings"
 #~ msgstr "绘图代码"
+
+
+#: ../src/dialog_colorpicker.cpp
+msgid "100% is fully opaque; 0% is fully transparent"
+msgstr "100% 完全不透明；0% 完全透明"
+
+#: ../src/dialog_colorpicker.cpp
+msgid "ASS Alpha:"
+msgstr "ASS Alpha："
+
+#: ../src/ass_block_editor_model.cpp
+msgid "ASS Drawing"
+msgstr "ASS 绘图"
+
+#: ../src/subs_edit_box.cpp
+msgid "ASS content"
+msgstr "ASS 内容"
+
+#: ../src/ass_block_editor_model.cpp
+msgid "ASS tag"
+msgstr "ASS 标签"
+
+#: ../src/dialog_about.cpp
+msgid "About Aegisub Localization Edition"
+msgstr "关于 Aegisub Localization Edition"
+
+#: ../src/subs_edit_box.cpp
+msgid "Add ASS block"
+msgstr "添加 ASS 方块"
+
+#: ../src/visual_tool_screen_mask.cpp
+msgid "Adjust screen mask"
+msgstr "调整画面遮罩"
+
+#: ../src/visual_tool_subtitle_mask.cpp
+msgid "Adjust subtitle mask"
+msgstr "调整字幕遮挡"
+
+#: ../src/visual_tool_drag.cpp
+msgid "Adjust subtitle position by frame"
+msgstr "按帧调整字幕位置"
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Advanced fade"
+msgstr "高级淡入淡出"
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Anchor/Alignment"
+msgstr "原点/对齐"
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Animation"
+msgstr "动画"
+
+#: ../src/dialog_ass_templates.cpp
+msgid "Apply subtitle template"
+msgstr "应用字幕模板"
+
+#: ../src/dialog_ass_templates.cpp
+msgid "Apply to current line"
+msgstr "应用到当前行"
+
+#: ../src/dialog_ass_templates.cpp
+msgid "Are you sure you want to delete this template?"
+msgstr "确定删除这个模板吗？"
+
+#: ../src/ass_template_store.cpp
+msgid "Blur"
+msgstr "模糊"
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Bold"
+msgstr "粗体"
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Border"
+msgstr "边缘"
+
+#: ../src/visual_tool_subtitle_mask.cpp
+msgid "Cancel mask"
+msgstr "取消遮挡"
+
+#: ../src/visual_tool_subtitle_mask.cpp
+msgid "Cancel subtitle mask"
+msgstr "取消字幕遮挡"
+
+#: ../src/visual_tool_subtitle_mask.cpp
+msgid "Cancel this subtitle mask from the current frame"
+msgstr "从当前帧开始取消这条字幕的遮挡"
+
+#: ../src/dialog_ass_templates.cpp
+msgid "Category"
+msgstr "分类"
+
+#: ../src/dialog_ass_templates.cpp
+msgid "Change category"
+msgstr "修改分类"
+
+#: ../src/visual_tool_screen_mask.cpp
+msgid "Change screen mask appearance"
+msgstr "修改画面遮罩外观"
+
+#: ../src/dialog_ass_templates.cpp
+msgid "Change template category"
+msgstr "修改模板分类"
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Character spacing"
+msgstr "字距"
+
+#: ../src/visual_tool_screen_mask.cpp
+msgid "Click to add points, double-click to finish the polygon, or right-click to cancel"
+msgstr "逐点绘制，多边形最后双击完成，右键取消"
+
+#: ../src/visual_tool_subtitle_mask.cpp
+msgid "Click to add points, double-click to finish, or right-click to cancel drawing"
+msgstr "逐点绘制，最后双击完成，右键取消绘制"
+
+#: ../src/subs_edit_box.cpp
+msgid "Click to select; Ctrl/Shift for multiple selection; double-click to edit; supports copy, cut, paste, and Delete"
+msgstr "单击选择；Ctrl/Shift 多选；双击编辑；支持复制、剪切、粘贴和 Delete"
+
+#: ../src/command/grid.cpp
+msgid "Collapse logical subtitle group"
+msgstr "收起逻辑字幕组"
+
+#: ../src/command/grid.cpp
+msgid "Collapse the logical group containing the selected subtitle"
+msgstr "收起所选字幕所在的逻辑组"
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Color"
+msgstr "颜色"
+
+#: ../src/visual_tool_screen_mask.cpp
+msgid "Color / Time / Layer"
+msgstr "颜色 / 时间 / 图层"
+
+#: ../src/dialog_ass_templates.cpp
+msgid "Content preview"
+msgstr "内容预览"
+
+#: ../src/subs_edit_box.cpp
+msgid "Copy"
+msgstr "复制"
+
+#: ../src/subs_edit_box.cpp
+msgid "Create ASS block"
+msgstr "新建 ASS 方块"
+
+#: ../src/visual_tool_screen_mask.cpp
+msgid "Create screen mask"
+msgstr "创建画面遮罩"
+
+#: ../src/dialog_ass_templates.cpp
+msgid "Create subtitle and apply"
+msgstr "新建字幕并应用"
+
+#: ../src/dialog_ass_templates.cpp
+msgid "Create subtitle and apply template"
+msgstr "新建字幕并应用模板"
+
+#: ../src/visual_tool_subtitle_mask.cpp
+msgid "Create subtitle mask"
+msgstr "创建字幕遮挡"
+
+#: ../src/visual_tool_screen_mask.cpp
+msgid "Current frame only (default)"
+msgstr "当前 1 帧（默认）"
+
+#: ../src/visual_tool_screen_mask.cpp
+msgid "Custom end frame"
+msgstr "自定义结束帧"
+
+#: ../src/visual_tool_screen_mask.cpp
+msgid "Custom start and end frames"
+msgstr "自定义起止帧"
+
+#: ../src/visual_tool_screen_mask.cpp
+msgid "Custom start frame"
+msgstr "自定义开始帧"
+
+#: ../src/subs_edit_box.cpp
+msgid "Cut"
+msgstr "剪切"
+
+#: ../src/subs_edit_box.cpp
+msgid "Cut ASS block"
+msgstr "剪切 ASS 方块"
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Decrease font size"
+msgstr "减小字号"
+
+#: ../src/subs_edit_box.cpp
+msgid "Delete ASS block"
+msgstr "删除 ASS 方块"
+
+#: ../src/dialog_ass_templates.cpp
+msgid "Delete template"
+msgstr "删除模板"
+
+#: ../src/visual_tool_subtitle_mask.cpp
+msgid "Drag a rectangle to hide only this area of the selected subtitle"
+msgstr "按住鼠标拖出矩形，仅隐藏所选字幕的这个区域"
+
+#: ../src/visual_tool_screen_mask.cpp
+msgid "Drag to draw a rectangular screen mask"
+msgstr "按住鼠标拖出矩形画面遮罩"
+
+#: ../src/command/vis_tool.cpp
+msgid "Draw a standard ASS Drawing mask directly on the video"
+msgstr "直接在视频画面上绘制标准 ASS Drawing 遮罩"
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Drawing"
+msgstr "绘图"
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Drawing baseline"
+msgstr "Drawing 基线"
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Drawing mode"
+msgstr "Drawing 模式"
+
+#: ../src/visual_tool_screen_mask.cpp
+msgid "Duration"
+msgstr "持续范围"
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Edge blur"
+msgstr "边缘模糊"
+
+#: ../src/subs_edit_box.cpp
+msgid "Edit ASS block"
+msgstr "编辑 ASS 方块"
+
+#: ../src/dialog_ass_templates.cpp
+msgid "Edit parameters before applying template"
+msgstr "套用模板前修改参数"
+
+#: ../src/subs_edit_box.cpp
+msgid "Edit the ASS content for this block:"
+msgstr "修改这个方块对应的 ASS 内容："
+
+#: ../src/ass_template_store.cpp
+msgid "End X"
+msgstr "终点 X"
+
+#: ../src/ass_template_store.cpp
+msgid "End Y"
+msgstr "终点 Y"
+
+#: ../src/visual_tool_subtitle_mask.cpp
+msgid "Enlarge"
+msgstr "放大"
+
+#: ../src/visual_tool_subtitle_mask.cpp
+msgid "Enlarge by 10% around the mask center"
+msgstr "以遮挡区域中心放大 10%"
+
+#: ../src/visual_tool_subtitle_mask.cpp
+msgid "Enlarge subtitle mask"
+msgstr "放大字幕遮挡"
+
+#: ../src/dialog_ass_templates.cpp
+msgid "Enter the new template name:"
+msgstr "输入新的模板名称："
+
+#: ../src/dialog_ass_templates.cpp
+msgid "Enter the template category:"
+msgstr "输入模板分类："
+
+#: ../src/command/grid.cpp
+msgid "Expand / Collapse logical subtitle group"
+msgstr "展开 / 收起逻辑字幕组"
+
+#: ../src/command/grid.cpp
+msgid "Expand logical subtitle group"
+msgstr "展开逻辑字幕组"
+
+#: ../src/command/grid.cpp
+msgid "Expand the logical group containing the selected subtitle"
+msgstr "展开所选字幕所在的逻辑组"
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Fade"
+msgstr "淡入淡出"
+
+#: ../src/ass_template_store.cpp
+msgid "Fade in"
+msgstr "淡入"
+
+#: ../src/ass_template_store.cpp
+msgid "Fade out"
+msgstr "淡出"
+
+#: ../src/dialog_ass_templates.cpp
+msgid "Failed to save global template"
+msgstr "保存全局模板失败"
+
+#: ../src/subs_edit_box.cpp
+msgid "Feature"
+msgstr "功能"
+
+#: ../src/subs_edit_box.cpp
+msgid "Feature block"
+msgstr "功能方块"
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Font encoding"
+msgstr "字体编码"
+
+#: ../src/dialog_colorpicker.cpp
+msgid "Frequently used project colors:"
+msgstr "项目常用颜色："
+
+#: ../src/visual_tool_screen_mask.cpp
+msgid "From the current frame to a specified time"
+msgstr "从当前帧到指定时间"
+
+#: ../src/visual_tool_screen_mask.cpp
+msgid "From the current frame to the end of the current subtitle"
+msgstr "从当前帧到当前字幕结束"
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Gaussian blur"
+msgstr "高斯模糊"
+
+#: ../src/dialog_ass_templates.cpp
+msgid "Global"
+msgstr "全局"
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Global opacity"
+msgstr "全局透明度"
+
+#: ../src/dialog_ass_templates.cpp
+msgid "Global template (available to all projects)"
+msgstr "全局模板（所有项目可用）"
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Hard line break"
+msgstr "硬换行"
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Increase font size"
+msgstr "增大字号"
+
+#: ../src/preferences.cpp
+msgid "Interface theme (restart required)"
+msgstr "界面主题（重启后生效）"
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Inverse clip"
+msgstr "反向裁剪"
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Italic"
+msgstr "斜体"
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Karaoke"
+msgstr "Karaoke"
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Karaoke fill"
+msgstr "Karaoke 填充"
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Karaoke outline"
+msgstr "Karaoke 描边"
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Karaoke sweep"
+msgstr "Karaoke 平滑"
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Karaoke timing"
+msgstr "Karaoke 时间"
+
+#: ../src/command/grid.cpp
+msgid "Keep the actual ASS subtitle lines and remove only the editor grouping"
+msgstr "保留实际 ASS 字幕行，只移除编辑器中的逻辑分组"
+
+#: ../src/visual_tool_screen_mask.cpp
+msgid "Mask color"
+msgstr "遮罩颜色"
+
+#: ../src/command/grid.cpp
+msgid "Merge into logical subtitle group"
+msgstr "合并为逻辑字幕组"
+
+#: ../src/fold_controller.cpp
+msgid "Merge logical subtitle group"
+msgstr "合并逻辑字幕组"
+
+#: ../src/command/grid.cpp
+msgid "Merge selected subtitles and existing groups into one flat logical group"
+msgstr "把选中的普通字幕和已有字幕组合并成一个扁平逻辑组"
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Move"
+msgstr "移动"
+
+#: ../src/visual_tool_screen_mask.cpp
+msgid "Multiple frames from the current frame"
+msgstr "从当前帧起持续多帧"
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Non-breaking space"
+msgstr "不换行空格"
+
+#: ../src/visual_tool_drag.cpp
+msgid "Nudge subtitle position by 1 pixel"
+msgstr "字幕位置 1 像素微调"
+
+#: ../src/visual_tool_screen_mask.cpp
+msgid "Number of frames"
+msgstr "多帧数量"
+
+#: ../src/dialog_colorpicker.cpp
+msgid "Opacity (%):"
+msgstr "不透明度（%）："
+
+#: ../src/visual_tool_screen_mask.cpp
+msgid "Opacity (0-100%)"
+msgstr "不透明度（0-100%）"
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Outline color"
+msgstr "描边颜色"
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Outline opacity"
+msgstr "描边透明度"
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Outline width"
+msgstr "描边宽度"
+
+#: ../src/ass_template_store.cpp
+msgid "Parameter"
+msgstr "参数"
+
+#: ../src/subs_edit_box.cpp
+msgid "Paste"
+msgstr "粘贴"
+
+#: ../src/subs_edit_box.cpp
+msgid "Paste ASS block"
+msgstr "粘贴 ASS 方块"
+
+#: ../src/visual_tool_subtitle_mask.cpp
+msgid "Path subtitle mask"
+msgstr "路径字幕遮挡"
+
+#: ../src/dialog_colorpicker.cpp
+msgid "Pick from the current raw video frame:"
+msgstr "从当前原始视频画面取色："
+
+#: ../src/visual_tool_screen_mask.cpp
+msgid "Polygon mask"
+msgstr "多边形遮罩"
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Position"
+msgstr "位置"
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Positioning"
+msgstr "定位"
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Primary color"
+msgstr "正文颜色"
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Primary opacity"
+msgstr "正文透明度"
+
+#: ../src/dialog_ass_templates.cpp
+msgid "Project"
+msgstr "项目"
+
+#: ../src/dialog_colorpicker.cpp
+msgid "Project and current video frame"
+msgstr "项目和当前视频画面"
+
+#: ../src/dialog_ass_templates.cpp
+msgid "Project template (saved with the current ASS file)"
+msgstr "项目模板（随当前 ASS 保存）"
+
+#: ../src/command/vis_tool.cpp
+msgid "Quick screen mask"
+msgstr "快速画面遮罩"
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Raw ASS"
+msgstr "原始 ASS"
+
+#: ../src/dialog_colorpicker.cpp
+msgid "Raw ASS alpha: 0 is opaque; 255 is transparent"
+msgstr "原始 ASS Alpha：0 为不透明，255 为透明"
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Rectangle clip"
+msgstr "矩形裁剪"
+
+#: ../src/visual_tool_screen_mask.cpp
+msgid "Rectangle mask"
+msgstr "矩形遮罩"
+
+#: ../src/visual_tool_subtitle_mask.cpp
+msgid "Rectangle subtitle mask"
+msgstr "矩形字幕遮挡"
+
+#: ../src/fold_controller.cpp
+msgid "Release current line from logical subtitle group"
+msgstr "从逻辑字幕组释放当前行"
+
+#: ../src/command/grid.cpp
+msgid "Release current subtitle from logical group"
+msgstr "从逻辑组释放当前字幕"
+
+#: ../src/command/grid.cpp
+msgid "Release entire logical subtitle group"
+msgstr "释放整个逻辑字幕组"
+
+#: ../src/command/grid.cpp
+msgid "Release only the current subtitle line and keep the remaining sides as flat groups when possible"
+msgstr "只释放当前实际字幕行，必要时把左右剩余部分保留为两个扁平组"
+
+#: ../src/dialog_ass_templates.cpp
+msgid "Rename"
+msgstr "重命名"
+
+#: ../src/dialog_ass_templates.cpp
+msgid "Rename template"
+msgstr "重命名模板"
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Reset style"
+msgstr "重置样式"
+
+#: ../src/visual_tool_subtitle_mask.cpp
+msgid "Rotate left"
+msgstr "左转"
+
+#: ../src/visual_tool_subtitle_mask.cpp
+msgid "Rotate right"
+msgstr "右转"
+
+#: ../src/visual_tool_subtitle_mask.cpp
+msgid "Rotate subtitle mask"
+msgstr "旋转字幕遮挡"
+
+#: ../src/visual_tool_subtitle_mask.cpp
+msgid "Rotate the mask 5 degrees clockwise"
+msgstr "将遮挡区域顺时针旋转 5 度"
+
+#: ../src/visual_tool_subtitle_mask.cpp
+msgid "Rotate the mask 5 degrees counterclockwise"
+msgstr "将遮挡区域逆时针旋转 5 度"
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Rotation origin"
+msgstr "旋转原点"
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Rotation/Perspective"
+msgstr "旋转/透视"
+
+#: ../src/dialog_ass_templates.cpp
+msgid "Save current line"
+msgstr "保存当前行"
+
+#: ../src/dialog_ass_templates.cpp
+msgid "Save current line as template"
+msgstr "保存当前行为模板"
+
+#: ../src/dialog_ass_templates.cpp
+msgid "Save scope"
+msgstr "保存范围"
+
+#: ../src/subs_edit_box.cpp
+msgid "Save, categorize, or apply global and project subtitle templates"
+msgstr "保存、分类或套用全局和项目字幕模板"
+
+#: ../src/dialog_ass_templates.cpp
+msgid "Scope"
+msgstr "范围"
+
+#: ../src/visual_tool_screen_mask.cpp
+msgid "Screen mask settings"
+msgstr "画面遮罩设置"
+
+#: ../src/subs_edit_box.cpp
+msgid "Search and add ASS features such as positioning, font, color, animation, and clipping"
+msgstr "搜索并添加定位、字体、颜色、动画、裁剪等 ASS 功能"
+
+#: ../src/subs_edit_box.cpp
+msgid "Search localized feature name or ASS tag, for example: anchor, an, frz"
+msgstr "搜索中文功能名或 ASS 标签，例如：原点、an、frz"
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Secondary color"
+msgstr "次要颜色"
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Secondary opacity"
+msgstr "次要透明度"
+
+#: ../src/visual_tool_drag.cpp
+msgid "Segment by frame"
+msgstr "按帧分段"
+
+#: ../src/command/grid.cpp
+msgid "Select all actual subtitle lines in the current logical group"
+msgstr "选择当前字幕所在逻辑组的全部实际字幕行"
+
+#: ../src/command/grid.cpp
+msgid "Select entire logical subtitle group"
+msgstr "选择整个逻辑字幕组"
+
+#: ../src/visual_tool_screen_mask.cpp
+msgid "Set mask color, opacity, layer, and frame-based duration"
+msgstr "设置遮罩颜色、不透明度、Layer 和按帧持续范围"
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Shadow color"
+msgstr "阴影颜色"
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Shadow distance"
+msgstr "阴影距离"
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Shadow opacity"
+msgstr "阴影透明度"
+
+#: ../src/subs_edit_box.cpp
+msgid "Show ASS source"
+msgstr "显示 ASS 源码"
+
+#: ../src/subs_edit_box.cpp
+msgid "Show and directly edit the complete ASS source below the block editor"
+msgstr "在方块编辑器下方显示并直接编辑完整 ASS 源码"
+
+#: ../src/visual_tool_subtitle_mask.cpp
+msgid "Shrink"
+msgstr "缩小"
+
+#: ../src/visual_tool_subtitle_mask.cpp
+msgid "Shrink by 10% around the mask center"
+msgstr "以遮挡区域中心缩小 10%"
+
+#: ../src/visual_tool_subtitle_mask.cpp
+msgid "Shrink subtitle mask"
+msgstr "缩小字幕遮挡"
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Soft line break"
+msgstr "软换行"
+
+#: ../src/visual_tool_screen_mask.cpp
+msgid "Specified end time"
+msgstr "指定结束时间"
+
+#: ../src/ass_template_store.cpp
+msgid "Start X"
+msgstr "起点 X"
+
+#: ../src/ass_template_store.cpp
+msgid "Start Y"
+msgstr "起点 Y"
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Strikeout"
+msgstr "删除线"
+
+#: ../src/command/vis_tool.cpp
+msgid "Subtitle mask"
+msgstr "字幕遮挡"
+
+#: ../src/dialog_ass_templates.cpp
+msgid "Subtitle templates"
+msgstr "字幕模板"
+
+#: ../src/dialog_ass_templates.cpp
+msgid "Template name"
+msgstr "模板名称"
+
+#: ../src/subs_edit_box.cpp
+msgid "Templates"
+msgstr "模板"
+
+#: ../src/visual_tool_screen_mask.cpp
+msgid "The color button uses the shared palette, eyedropper, recent colors, and frequently used project colors."
+msgstr "颜色按钮复用统一调色盘、吸色笔、最近颜色和项目常用颜色。"
+
+#: ../src/preferences.cpp
+msgid "Theme"
+msgstr "主题"
+
+#: ../src/ass_template_store.cpp
+msgid "Time/acceleration"
+msgstr "时间/加速"
+
+#: ../src/command/grid.cpp
+msgid "Toggle the logical group containing the selected subtitle"
+msgstr "切换所选字幕所在逻辑组的展开状态"
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Transform"
+msgstr "动画变换"
+
+#: ../src/dialog_ass_templates.cpp
+msgid "Uncategorized"
+msgstr "未分类"
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Underline"
+msgstr "下划线"
+
+#: ../src/dialog_ass_templates.cpp
+msgid "Update project subtitle templates"
+msgstr "修改项目字幕模板"
+
+#: ../src/command/vis_tool.cpp
+msgid "Use standard ASS inverse clipping to hide part of the selected subtitle from the current frame"
+msgstr "从当前帧开始用标准 ASS 反向裁剪隐藏所选字幕的局部区域"
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Vector clip"
+msgstr "矢量裁剪"
+
+#: ../src/visual_tool_drag.cpp
+msgid "When enabled, dragging and arrow-key nudging creates a held state from the current exact video frame"
+msgstr "开启后，拖动和方向键微调会从当前真实视频帧开始建立 Hold 状态"
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Wrapping style"
+msgstr "换行方式"
+
+#: ../src/ass_template_store.cpp
+msgid "X outline"
+msgstr "X 描边"
+
+#: ../src/ass_block_editor_model.cpp
+msgid "X outline width"
+msgstr "X 描边宽度"
+
+#: ../src/ass_block_editor_model.cpp
+msgid "X rotation"
+msgstr "X 轴旋转"
+
+#: ../src/ass_block_editor_model.cpp
+msgid "X scale"
+msgstr "X 缩放"
+
+#: ../src/ass_template_store.cpp
+msgid "X shadow"
+msgstr "X 阴影"
+
+#: ../src/ass_block_editor_model.cpp
+msgid "X shadow distance"
+msgstr "X 阴影距离"
+
+#: ../src/ass_block_editor_model.cpp
+msgid "X shear"
+msgstr "X 轴倾斜"
+
+#: ../src/ass_template_store.cpp
+msgid "Y outline"
+msgstr "Y 描边"
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Y outline width"
+msgstr "Y 描边宽度"
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Y rotation"
+msgstr "Y 轴旋转"
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Y scale"
+msgstr "Y 缩放"
+
+#: ../src/ass_template_store.cpp
+msgid "Y shadow"
+msgstr "Y 阴影"
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Y shadow distance"
+msgstr "Y 阴影距离"
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Y shear"
+msgstr "Y 轴倾斜"
+
+#: ../src/dialog_ass_templates.cpp
+msgid "You can edit position, color, font size, animation timing, and text. Leave a value unchanged to keep it."
+msgstr "可以直接修改位置、颜色、字号、动画时间和正文；留在原值即可保持不变。"
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Z rotation"
+msgstr "Z 轴旋转"

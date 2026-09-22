@@ -25,7 +25,7 @@ TEST(ass_block_editor_model, untouched_source_is_byte_exact_and_unknown_content_
 	ASSERT_GE(items.size(), 9u);
 	EXPECT_EQ(ItemKind::Comment, items[1].kind);
 	EXPECT_EQ(ItemKind::Tag, items[2].kind);
-	EXPECT_EQ("原点/对齐", items[2].label);
+	EXPECT_EQ("Anchor/Alignment", items[2].label);
 	EXPECT_EQ(ItemKind::Raw, items[4].kind);
 	EXPECT_EQ("\\vendor(foo,(bar,baz))", items[4].source);
 	EXPECT_TRUE(std::any_of(items.begin(), items.end(), [](auto const& item) {
@@ -33,14 +33,14 @@ TEST(ass_block_editor_model, untouched_source_is_byte_exact_and_unknown_content_
 	}));
 }
 
-TEST(ass_block_editor_model, feature_search_accepts_chinese_names_and_ass_tags) {
+TEST(ass_block_editor_model, feature_search_accepts_localized_names_and_ass_tags) {
 	auto alignment = Model::SearchFeatures("an");
 	ASSERT_FALSE(alignment.empty());
 	EXPECT_TRUE(std::any_of(alignment.begin(), alignment.end(), [](auto const& feature) {
-		return feature.tag == "an" && feature.name == "原点/对齐";
+		return feature.tag == "an" && feature.name == "Anchor/Alignment";
 	}));
 
-	auto rotation = Model::SearchFeatures("Z 轴旋转");
+	auto rotation = Model::SearchFeatures("Z rotation");
 	ASSERT_FALSE(rotation.empty());
 	EXPECT_TRUE(std::any_of(rotation.begin(), rotation.end(), [](auto const& feature) {
 		return feature.tag == "frz";
@@ -87,6 +87,6 @@ TEST(ass_block_editor_model, reparses_direct_source_edits_into_blocks) {
 	model.SetSource(edited);
 	EXPECT_EQ(edited, model.Serialize());
 	ASSERT_GE(model.Items().size(), 3u);
-	EXPECT_EQ("位置", model.Items()[0].label);
+	EXPECT_EQ("Position", model.Items()[0].label);
 	EXPECT_EQ(ItemKind::Raw, model.Items()[1].kind);
 }

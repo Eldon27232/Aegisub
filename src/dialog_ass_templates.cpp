@@ -47,22 +47,22 @@ class TemplateDetailsDialog final : public wxDialog {
 
 public:
 	TemplateDetailsDialog(wxWindow *parent, wxString const& title,
-		wxString const& initial_name = {}, wxString const& initial_category = _("未分类"))
+		wxString const& initial_name = {}, wxString const& initial_category = _("Uncategorized"))
 	: wxDialog(parent, wxID_ANY, title, wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE)
 	{
 		auto *sizer = new wxBoxSizer(wxVERTICAL);
 		auto *grid = new wxFlexGridSizer(2, FromDIP(8), FromDIP(8));
 		grid->AddGrowableCol(1, 1);
-		grid->Add(new wxStaticText(this, wxID_ANY, _("模板名称")), wxSizerFlags().CenterVertical());
+		grid->Add(new wxStaticText(this, wxID_ANY, _("Template name")), wxSizerFlags().CenterVertical());
 		name = new wxTextCtrl(this, wxID_ANY, initial_name);
 		grid->Add(name, wxSizerFlags(1).Expand());
-		grid->Add(new wxStaticText(this, wxID_ANY, _("分类")), wxSizerFlags().CenterVertical());
+		grid->Add(new wxStaticText(this, wxID_ANY, _("Category")), wxSizerFlags().CenterVertical());
 		category = new wxTextCtrl(this, wxID_ANY, initial_category);
 		grid->Add(category, wxSizerFlags(1).Expand());
-		grid->Add(new wxStaticText(this, wxID_ANY, _("保存范围")), wxSizerFlags().CenterVertical());
+		grid->Add(new wxStaticText(this, wxID_ANY, _("Save scope")), wxSizerFlags().CenterVertical());
 		scope = new wxChoice(this, wxID_ANY);
-		scope->Append(_("全局模板（所有项目可用）"));
-		scope->Append(_("项目模板（随当前 ASS 保存）"));
+		scope->Append(_("Global template (available to all projects)"));
+		scope->Append(_("Project template (saved with the current ASS file)"));
 		scope->SetSelection(0);
 		grid->Add(scope, wxSizerFlags(1).Expand());
 		sizer->Add(grid, wxSizerFlags(1).Expand().Border(wxALL));
@@ -85,13 +85,13 @@ class TemplateParametersDialog final : public wxDialog {
 
 public:
 	TemplateParametersDialog(wxWindow *parent, std::string_view source)
-	: wxDialog(parent, wxID_ANY, _("套用模板前修改参数"), wxDefaultPosition, wxDefaultSize,
+	: wxDialog(parent, wxID_ANY, _("Edit parameters before applying template"), wxDefaultPosition, wxDefaultSize,
 		wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER)
 	, parameters(ass::templates::ExtractParameters(source))
 	{
 		auto *sizer = new wxBoxSizer(wxVERTICAL);
 		sizer->Add(new wxStaticText(this, wxID_ANY,
-		_("可以直接修改位置、颜色、字号、动画时间和正文；留在原值即可保持不变。")),
+		_("You can edit position, color, font size, animation timing, and text. Leave a value unchanged to keep it.")),
 		wxSizerFlags().Expand().Border(wxALL));
 
 		auto *scroll = new wxScrolledWindow(this, wxID_ANY, wxDefaultPosition, FromDIP(wxSize(620, 360)), wxVSCROLL);
@@ -153,7 +153,7 @@ class TemplateManagerDialog final : public wxDialog {
 			return true;
 		}
 		catch (agi::fs::FileSystemError const& error) {
-			wxMessageBox(to_wx(error.GetMessage()), _("保存全局模板失败"), wxOK | wxICON_ERROR, this);
+			wxMessageBox(to_wx(error.GetMessage()), _("Failed to save global template"), wxOK | wxICON_ERROR, this);
 			return false;
 		}
 	}
@@ -163,7 +163,7 @@ class TemplateManagerDialog final : public wxDialog {
 		auto encoded = any ? ass::templates::Encode(entries, Scope::Project) : std::string{};
 		if (encoded == context->ass->Properties.localization_templates) return;
 		context->ass->Properties.localization_templates = std::move(encoded);
-		context->ass->Commit(_("修改项目字幕模板"), AssFile::COMMIT_SCRIPTINFO);
+		context->ass->Commit(_("Update project subtitle templates"), AssFile::COMMIT_SCRIPTINFO);
 	}
 
 	void SaveScope(Scope scope) {
@@ -193,7 +193,7 @@ class TemplateManagerDialog final : public wxDialog {
 		long select_row = -1;
 		for (size_t i = 0; i < entries.size(); ++i) {
 			auto const& entry = entries[i];
-			long row = list->InsertItem(static_cast<long>(i), entry.scope == Scope::Global ? _("全局") : _("项目"));
+			long row = list->InsertItem(static_cast<long>(i), entry.scope == Scope::Global ? _("Global") : _("Project"));
 			list->SetItem(row, 1, to_wx(entry.category));
 			list->SetItem(row, 2, to_wx(entry.name));
 			auto preview = to_wx(entry.text);
@@ -233,7 +233,7 @@ class TemplateManagerDialog final : public wxDialog {
 	void SaveCurrent(wxCommandEvent&) {
 		auto *active = context->selectionController->GetActiveLine();
 		if (!active) return;
-		TemplateDetailsDialog dialog(this, _("保存当前行为模板"));
+		TemplateDetailsDialog dialog(this, _("Save current line as template"));
 		if (dialog.ShowModal() != wxID_OK || dialog.Name().empty()) return;
 		Entry entry{NewId(), dialog.Name(), dialog.Category(), active->Text.get(), dialog.SelectedScope()};
 		entries.push_back(entry);
@@ -244,7 +244,7 @@ class TemplateManagerDialog final : public wxDialog {
 	void Rename(wxCommandEvent&) {
 		auto index = SelectedIndex();
 		if (!index) return;
-		wxTextEntryDialog dialog(this, _("输入新的模板名称："), _("重命名模板"), to_wx(entries[*index].name));
+		wxTextEntryDialog dialog(this, _("Enter the new template name:"), _("Rename template"), to_wx(entries[*index].name));
 		if (dialog.ShowModal() != wxID_OK || dialog.GetValue().empty()) return;
 		entries[*index].name = from_wx(dialog.GetValue());
 		SaveScope(entries[*index].scope);
@@ -254,7 +254,7 @@ class TemplateManagerDialog final : public wxDialog {
 	void ChangeCategory(wxCommandEvent&) {
 		auto index = SelectedIndex();
 		if (!index) return;
-		wxTextEntryDialog dialog(this, _("输入模板分类："), _("修改模板分类"), to_wx(entries[*index].category));
+		wxTextEntryDialog dialog(this, _("Enter the template category:"), _("Change template category"), to_wx(entries[*index].category));
 		if (dialog.ShowModal() != wxID_OK) return;
 		entries[*index].category = from_wx(dialog.GetValue());
 		SaveScope(entries[*index].scope);
@@ -264,7 +264,7 @@ class TemplateManagerDialog final : public wxDialog {
 	void Remove(wxCommandEvent&) {
 		auto index = SelectedIndex();
 		if (!index) return;
-		if (wxMessageBox(_("确定删除这个模板吗？"), _("删除模板"), wxYES_NO | wxNO_DEFAULT | wxICON_QUESTION, this) != wxYES) return;
+		if (wxMessageBox(_("Are you sure you want to delete this template?"), _("Delete template"), wxYES_NO | wxNO_DEFAULT | wxICON_QUESTION, this) != wxYES) return;
 		auto scope = entries[*index].scope;
 		entries.erase(entries.begin() + *index);
 		SaveScope(scope);
@@ -278,7 +278,7 @@ class TemplateManagerDialog final : public wxDialog {
 		auto text = PreparedText(entries[*index]);
 		if (!text) return;
 		active->Text = *text;
-		context->ass->Commit(_("应用字幕模板"), AssFile::COMMIT_DIAG_TEXT, -1, active);
+		context->ass->Commit(_("Apply subtitle template"), AssFile::COMMIT_DIAG_TEXT, -1, active);
 		EndModal(wxID_OK);
 	}
 
@@ -296,14 +296,14 @@ class TemplateManagerDialog final : public wxDialog {
 		created->End = created->Start + OPT_GET("Timing/Default Duration")->GetInt();
 		created->Text = *text;
 		context->ass->Events.insert(++context->ass->iterator_to(*active), *created);
-		context->ass->Commit(_("新建字幕并应用模板"), AssFile::COMMIT_DIAG_ADDREM);
+		context->ass->Commit(_("Create subtitle and apply template"), AssFile::COMMIT_DIAG_ADDREM);
 		context->selectionController->SetSelectionAndActive({created}, created);
 		EndModal(wxID_OK);
 	}
 
 public:
 	TemplateManagerDialog(wxWindow *parent, agi::Context *context)
-	: wxDialog(parent, wxID_ANY, _("字幕模板"), wxDefaultPosition, wxDefaultSize,
+	: wxDialog(parent, wxID_ANY, _("Subtitle templates"), wxDefaultPosition, wxDefaultSize,
 		wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER)
 	, context(context)
 	, global_path(config::path->Decode("?user/localization_templates.dat"))
@@ -312,24 +312,24 @@ public:
 		auto *sizer = new wxBoxSizer(wxVERTICAL);
 		list = new wxListCtrl(this, wxID_ANY, wxDefaultPosition, FromDIP(wxSize(720, 350)),
 			wxLC_REPORT | wxLC_SINGLE_SEL | wxLC_HRULES | wxLC_VRULES);
-		list->InsertColumn(0, _("范围"));
-		list->InsertColumn(1, _("分类"));
-		list->InsertColumn(2, _("模板名称"));
-		list->InsertColumn(3, _("内容预览"));
+		list->InsertColumn(0, _("Scope"));
+		list->InsertColumn(1, _("Category"));
+		list->InsertColumn(2, _("Template name"));
+		list->InsertColumn(3, _("Content preview"));
 		sizer->Add(list, wxSizerFlags(1).Expand().Border(wxALL));
 
 		auto *manage = new wxBoxSizer(wxHORIZONTAL);
-		auto *save = new wxButton(this, wxID_ANY, _("保存当前行"));
-		rename = new wxButton(this, wxID_ANY, _("重命名"));
-		change_category = new wxButton(this, wxID_ANY, _("修改分类"));
-		remove = new wxButton(this, wxID_ANY, _("删除"));
+		auto *save = new wxButton(this, wxID_ANY, _("Save current line"));
+		rename = new wxButton(this, wxID_ANY, _("Rename"));
+		change_category = new wxButton(this, wxID_ANY, _("Change category"));
+		remove = new wxButton(this, wxID_ANY, _("Delete"));
 		manage->Add(save, wxSizerFlags().Border(wxRIGHT));
 		manage->Add(rename, wxSizerFlags().Border(wxRIGHT));
 		manage->Add(change_category, wxSizerFlags().Border(wxRIGHT));
 		manage->Add(remove);
 		manage->AddStretchSpacer();
-		apply_current = new wxButton(this, wxID_ANY, _("应用到当前行"));
-		apply_new = new wxButton(this, wxID_ANY, _("新建字幕并应用"));
+		apply_current = new wxButton(this, wxID_ANY, _("Apply to current line"));
+		apply_new = new wxButton(this, wxID_ANY, _("Create subtitle and apply"));
 		manage->Add(apply_current, wxSizerFlags().Border(wxRIGHT));
 		manage->Add(apply_new);
 		sizer->Add(manage, wxSizerFlags().Expand().Border(wxLEFT | wxRIGHT | wxBOTTOM));

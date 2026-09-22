@@ -164,17 +164,17 @@ namespace {
 	struct visual_mode_screen_mask final : public visual_tool_command<VisualToolScreenMask> {
 		CMD_NAME("video/tool/screen_mask")
 		CMD_ICON(visual_clip)
-		STR_MENU("快速画面遮罩")
-		STR_DISP("快速画面遮罩")
-		STR_HELP("直接在视频画面上绘制标准 ASS Drawing 遮罩")
+		STR_MENU("Quick screen mask")
+		STR_DISP("Quick screen mask")
+		STR_HELP("Draw a standard ASS Drawing mask directly on the video")
 	};
 
 	struct visual_mode_subtitle_mask final : public visual_tool_command<VisualToolSubtitleMask> {
 		CMD_NAME("video/tool/subtitle_mask")
 		CMD_ICON(visual_vector_clip)
-		STR_MENU("字幕遮挡")
-		STR_DISP("字幕遮挡")
-		STR_HELP("从当前帧开始用标准 ASS 反向裁剪隐藏所选字幕的局部区域")
+		STR_MENU("Subtitle mask")
+		STR_DISP("Subtitle mask")
+		STR_HELP("Use standard ASS inverse clipping to hide part of the selected subtitle from the current frame")
 	};
 
 	// Perspective settings

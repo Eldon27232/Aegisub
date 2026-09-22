@@ -6968,3 +6968,810 @@ msgstr ""
 msgid "This will install Aegisub {#BUILD_GIT_VERSION_STRING} on your computer.%n%nAegisub is covered by the GNU General Public License version 2. This means you may use the application for any purpose without charge, but that no warranties of any kind are given either.%n%nSee the Aegisub website for information on obtaining the source code."
 msgstr ""
 
+#: ../src/dialog_colorpicker.cpp
+msgid "100% is fully opaque; 0% is fully transparent"
+msgstr ""
+
+#: ../src/dialog_colorpicker.cpp
+msgid "ASS Alpha:"
+msgstr ""
+
+#: ../src/ass_block_editor_model.cpp
+msgid "ASS Drawing"
+msgstr ""
+
+#: ../src/subs_edit_box.cpp
+msgid "ASS content"
+msgstr ""
+
+#: ../src/ass_block_editor_model.cpp
+msgid "ASS tag"
+msgstr ""
+
+#: ../src/dialog_about.cpp
+msgid "About Aegisub Localization Edition"
+msgstr ""
+
+#: ../src/subs_edit_box.cpp
+msgid "Add ASS block"
+msgstr ""
+
+#: ../src/visual_tool_screen_mask.cpp
+msgid "Adjust screen mask"
+msgstr ""
+
+#: ../src/visual_tool_subtitle_mask.cpp
+msgid "Adjust subtitle mask"
+msgstr ""
+
+#: ../src/visual_tool_drag.cpp
+msgid "Adjust subtitle position by frame"
+msgstr ""
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Advanced fade"
+msgstr ""
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Anchor/Alignment"
+msgstr ""
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Animation"
+msgstr ""
+
+#: ../src/dialog_ass_templates.cpp
+msgid "Apply subtitle template"
+msgstr ""
+
+#: ../src/dialog_ass_templates.cpp
+msgid "Apply to current line"
+msgstr ""
+
+#: ../src/dialog_ass_templates.cpp
+msgid "Are you sure you want to delete this template?"
+msgstr ""
+
+#: ../src/ass_template_store.cpp
+msgid "Blur"
+msgstr ""
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Bold"
+msgstr ""
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Border"
+msgstr ""
+
+#: ../src/visual_tool_subtitle_mask.cpp
+msgid "Cancel mask"
+msgstr ""
+
+#: ../src/visual_tool_subtitle_mask.cpp
+msgid "Cancel subtitle mask"
+msgstr ""
+
+#: ../src/visual_tool_subtitle_mask.cpp
+msgid "Cancel this subtitle mask from the current frame"
+msgstr ""
+
+#: ../src/dialog_ass_templates.cpp
+msgid "Category"
+msgstr ""
+
+#: ../src/dialog_ass_templates.cpp
+msgid "Change category"
+msgstr ""
+
+#: ../src/visual_tool_screen_mask.cpp
+msgid "Change screen mask appearance"
+msgstr ""
+
+#: ../src/dialog_ass_templates.cpp
+msgid "Change template category"
+msgstr ""
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Character spacing"
+msgstr ""
+
+#: ../src/visual_tool_screen_mask.cpp
+msgid "Click to add points, double-click to finish the polygon, or right-click to cancel"
+msgstr ""
+
+#: ../src/visual_tool_subtitle_mask.cpp
+msgid "Click to add points, double-click to finish, or right-click to cancel drawing"
+msgstr ""
+
+#: ../src/subs_edit_box.cpp
+msgid "Click to select; Ctrl/Shift for multiple selection; double-click to edit; supports copy, cut, paste, and Delete"
+msgstr ""
+
+#: ../src/command/grid.cpp
+msgid "Collapse logical subtitle group"
+msgstr ""
+
+#: ../src/command/grid.cpp
+msgid "Collapse the logical group containing the selected subtitle"
+msgstr ""
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Color"
+msgstr ""
+
+#: ../src/visual_tool_screen_mask.cpp
+msgid "Color / Time / Layer"
+msgstr ""
+
+#: ../src/dialog_ass_templates.cpp
+msgid "Content preview"
+msgstr ""
+
+#: ../src/subs_edit_box.cpp
+msgid "Copy"
+msgstr ""
+
+#: ../src/subs_edit_box.cpp
+msgid "Create ASS block"
+msgstr ""
+
+#: ../src/visual_tool_screen_mask.cpp
+msgid "Create screen mask"
+msgstr ""
+
+#: ../src/dialog_ass_templates.cpp
+msgid "Create subtitle and apply"
+msgstr ""
+
+#: ../src/dialog_ass_templates.cpp
+msgid "Create subtitle and apply template"
+msgstr ""
+
+#: ../src/visual_tool_subtitle_mask.cpp
+msgid "Create subtitle mask"
+msgstr ""
+
+#: ../src/visual_tool_screen_mask.cpp
+msgid "Current frame only (default)"
+msgstr ""
+
+#: ../src/visual_tool_screen_mask.cpp
+msgid "Custom end frame"
+msgstr ""
+
+#: ../src/visual_tool_screen_mask.cpp
+msgid "Custom start and end frames"
+msgstr ""
+
+#: ../src/visual_tool_screen_mask.cpp
+msgid "Custom start frame"
+msgstr ""
+
+#: ../src/subs_edit_box.cpp
+msgid "Cut"
+msgstr ""
+
+#: ../src/subs_edit_box.cpp
+msgid "Cut ASS block"
+msgstr ""
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Decrease font size"
+msgstr ""
+
+#: ../src/subs_edit_box.cpp
+msgid "Delete ASS block"
+msgstr ""
+
+#: ../src/dialog_ass_templates.cpp
+msgid "Delete template"
+msgstr ""
+
+#: ../src/visual_tool_subtitle_mask.cpp
+msgid "Drag a rectangle to hide only this area of the selected subtitle"
+msgstr ""
+
+#: ../src/visual_tool_screen_mask.cpp
+msgid "Drag to draw a rectangular screen mask"
+msgstr ""
+
+#: ../src/command/vis_tool.cpp
+msgid "Draw a standard ASS Drawing mask directly on the video"
+msgstr ""
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Drawing"
+msgstr ""
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Drawing baseline"
+msgstr ""
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Drawing mode"
+msgstr ""
+
+#: ../src/visual_tool_screen_mask.cpp
+msgid "Duration"
+msgstr ""
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Edge blur"
+msgstr ""
+
+#: ../src/subs_edit_box.cpp
+msgid "Edit ASS block"
+msgstr ""
+
+#: ../src/dialog_ass_templates.cpp
+msgid "Edit parameters before applying template"
+msgstr ""
+
+#: ../src/subs_edit_box.cpp
+msgid "Edit the ASS content for this block:"
+msgstr ""
+
+#: ../src/ass_template_store.cpp
+msgid "End X"
+msgstr ""
+
+#: ../src/ass_template_store.cpp
+msgid "End Y"
+msgstr ""
+
+#: ../src/visual_tool_subtitle_mask.cpp
+msgid "Enlarge"
+msgstr ""
+
+#: ../src/visual_tool_subtitle_mask.cpp
+msgid "Enlarge by 10% around the mask center"
+msgstr ""
+
+#: ../src/visual_tool_subtitle_mask.cpp
+msgid "Enlarge subtitle mask"
+msgstr ""
+
+#: ../src/dialog_ass_templates.cpp
+msgid "Enter the new template name:"
+msgstr ""
+
+#: ../src/dialog_ass_templates.cpp
+msgid "Enter the template category:"
+msgstr ""
+
+#: ../src/command/grid.cpp
+msgid "Expand / Collapse logical subtitle group"
+msgstr ""
+
+#: ../src/command/grid.cpp
+msgid "Expand logical subtitle group"
+msgstr ""
+
+#: ../src/command/grid.cpp
+msgid "Expand the logical group containing the selected subtitle"
+msgstr ""
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Fade"
+msgstr ""
+
+#: ../src/ass_template_store.cpp
+msgid "Fade in"
+msgstr ""
+
+#: ../src/ass_template_store.cpp
+msgid "Fade out"
+msgstr ""
+
+#: ../src/dialog_ass_templates.cpp
+msgid "Failed to save global template"
+msgstr ""
+
+#: ../src/subs_edit_box.cpp
+msgid "Feature"
+msgstr ""
+
+#: ../src/subs_edit_box.cpp
+msgid "Feature block"
+msgstr ""
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Font encoding"
+msgstr ""
+
+#: ../src/dialog_colorpicker.cpp
+msgid "Frequently used project colors:"
+msgstr ""
+
+#: ../src/visual_tool_screen_mask.cpp
+msgid "From the current frame to a specified time"
+msgstr ""
+
+#: ../src/visual_tool_screen_mask.cpp
+msgid "From the current frame to the end of the current subtitle"
+msgstr ""
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Gaussian blur"
+msgstr ""
+
+#: ../src/dialog_ass_templates.cpp
+msgid "Global"
+msgstr ""
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Global opacity"
+msgstr ""
+
+#: ../src/dialog_ass_templates.cpp
+msgid "Global template (available to all projects)"
+msgstr ""
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Hard line break"
+msgstr ""
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Increase font size"
+msgstr ""
+
+#: ../src/preferences.cpp
+msgid "Interface theme (restart required)"
+msgstr ""
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Inverse clip"
+msgstr ""
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Italic"
+msgstr ""
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Karaoke"
+msgstr ""
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Karaoke fill"
+msgstr ""
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Karaoke outline"
+msgstr ""
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Karaoke sweep"
+msgstr ""
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Karaoke timing"
+msgstr ""
+
+#: ../src/command/grid.cpp
+msgid "Keep the actual ASS subtitle lines and remove only the editor grouping"
+msgstr ""
+
+#: ../src/visual_tool_screen_mask.cpp
+msgid "Mask color"
+msgstr ""
+
+#: ../src/command/grid.cpp
+msgid "Merge into logical subtitle group"
+msgstr ""
+
+#: ../src/fold_controller.cpp
+msgid "Merge logical subtitle group"
+msgstr ""
+
+#: ../src/command/grid.cpp
+msgid "Merge selected subtitles and existing groups into one flat logical group"
+msgstr ""
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Move"
+msgstr ""
+
+#: ../src/visual_tool_screen_mask.cpp
+msgid "Multiple frames from the current frame"
+msgstr ""
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Non-breaking space"
+msgstr ""
+
+#: ../src/visual_tool_drag.cpp
+msgid "Nudge subtitle position by 1 pixel"
+msgstr ""
+
+#: ../src/visual_tool_screen_mask.cpp
+msgid "Number of frames"
+msgstr ""
+
+#: ../src/dialog_colorpicker.cpp
+msgid "Opacity (%):"
+msgstr ""
+
+#: ../src/visual_tool_screen_mask.cpp
+msgid "Opacity (0-100%)"
+msgstr ""
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Outline color"
+msgstr ""
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Outline opacity"
+msgstr ""
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Outline width"
+msgstr ""
+
+#: ../src/ass_template_store.cpp
+msgid "Parameter"
+msgstr ""
+
+#: ../src/subs_edit_box.cpp
+msgid "Paste"
+msgstr ""
+
+#: ../src/subs_edit_box.cpp
+msgid "Paste ASS block"
+msgstr ""
+
+#: ../src/visual_tool_subtitle_mask.cpp
+msgid "Path subtitle mask"
+msgstr ""
+
+#: ../src/dialog_colorpicker.cpp
+msgid "Pick from the current raw video frame:"
+msgstr ""
+
+#: ../src/visual_tool_screen_mask.cpp
+msgid "Polygon mask"
+msgstr ""
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Position"
+msgstr ""
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Positioning"
+msgstr ""
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Primary color"
+msgstr ""
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Primary opacity"
+msgstr ""
+
+#: ../src/dialog_ass_templates.cpp
+msgid "Project"
+msgstr ""
+
+#: ../src/dialog_colorpicker.cpp
+msgid "Project and current video frame"
+msgstr ""
+
+#: ../src/dialog_ass_templates.cpp
+msgid "Project template (saved with the current ASS file)"
+msgstr ""
+
+#: ../src/command/vis_tool.cpp
+msgid "Quick screen mask"
+msgstr ""
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Raw ASS"
+msgstr ""
+
+#: ../src/dialog_colorpicker.cpp
+msgid "Raw ASS alpha: 0 is opaque; 255 is transparent"
+msgstr ""
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Rectangle clip"
+msgstr ""
+
+#: ../src/visual_tool_screen_mask.cpp
+msgid "Rectangle mask"
+msgstr ""
+
+#: ../src/visual_tool_subtitle_mask.cpp
+msgid "Rectangle subtitle mask"
+msgstr ""
+
+#: ../src/fold_controller.cpp
+msgid "Release current line from logical subtitle group"
+msgstr ""
+
+#: ../src/command/grid.cpp
+msgid "Release current subtitle from logical group"
+msgstr ""
+
+#: ../src/command/grid.cpp
+msgid "Release entire logical subtitle group"
+msgstr ""
+
+#: ../src/command/grid.cpp
+msgid "Release only the current subtitle line and keep the remaining sides as flat groups when possible"
+msgstr ""
+
+#: ../src/dialog_ass_templates.cpp
+msgid "Rename"
+msgstr ""
+
+#: ../src/dialog_ass_templates.cpp
+msgid "Rename template"
+msgstr ""
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Reset style"
+msgstr ""
+
+#: ../src/visual_tool_subtitle_mask.cpp
+msgid "Rotate left"
+msgstr ""
+
+#: ../src/visual_tool_subtitle_mask.cpp
+msgid "Rotate right"
+msgstr ""
+
+#: ../src/visual_tool_subtitle_mask.cpp
+msgid "Rotate subtitle mask"
+msgstr ""
+
+#: ../src/visual_tool_subtitle_mask.cpp
+msgid "Rotate the mask 5 degrees clockwise"
+msgstr ""
+
+#: ../src/visual_tool_subtitle_mask.cpp
+msgid "Rotate the mask 5 degrees counterclockwise"
+msgstr ""
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Rotation origin"
+msgstr ""
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Rotation/Perspective"
+msgstr ""
+
+#: ../src/dialog_ass_templates.cpp
+msgid "Save current line"
+msgstr ""
+
+#: ../src/dialog_ass_templates.cpp
+msgid "Save current line as template"
+msgstr ""
+
+#: ../src/dialog_ass_templates.cpp
+msgid "Save scope"
+msgstr ""
+
+#: ../src/subs_edit_box.cpp
+msgid "Save, categorize, or apply global and project subtitle templates"
+msgstr ""
+
+#: ../src/dialog_ass_templates.cpp
+msgid "Scope"
+msgstr ""
+
+#: ../src/visual_tool_screen_mask.cpp
+msgid "Screen mask settings"
+msgstr ""
+
+#: ../src/subs_edit_box.cpp
+msgid "Search and add ASS features such as positioning, font, color, animation, and clipping"
+msgstr ""
+
+#: ../src/subs_edit_box.cpp
+msgid "Search localized feature name or ASS tag, for example: anchor, an, frz"
+msgstr ""
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Secondary color"
+msgstr ""
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Secondary opacity"
+msgstr ""
+
+#: ../src/visual_tool_drag.cpp
+msgid "Segment by frame"
+msgstr ""
+
+#: ../src/command/grid.cpp
+msgid "Select all actual subtitle lines in the current logical group"
+msgstr ""
+
+#: ../src/command/grid.cpp
+msgid "Select entire logical subtitle group"
+msgstr ""
+
+#: ../src/visual_tool_screen_mask.cpp
+msgid "Set mask color, opacity, layer, and frame-based duration"
+msgstr ""
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Shadow color"
+msgstr ""
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Shadow distance"
+msgstr ""
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Shadow opacity"
+msgstr ""
+
+#: ../src/subs_edit_box.cpp
+msgid "Show ASS source"
+msgstr ""
+
+#: ../src/subs_edit_box.cpp
+msgid "Show and directly edit the complete ASS source below the block editor"
+msgstr ""
+
+#: ../src/visual_tool_subtitle_mask.cpp
+msgid "Shrink"
+msgstr ""
+
+#: ../src/visual_tool_subtitle_mask.cpp
+msgid "Shrink by 10% around the mask center"
+msgstr ""
+
+#: ../src/visual_tool_subtitle_mask.cpp
+msgid "Shrink subtitle mask"
+msgstr ""
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Soft line break"
+msgstr ""
+
+#: ../src/visual_tool_screen_mask.cpp
+msgid "Specified end time"
+msgstr ""
+
+#: ../src/ass_template_store.cpp
+msgid "Start X"
+msgstr ""
+
+#: ../src/ass_template_store.cpp
+msgid "Start Y"
+msgstr ""
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Strikeout"
+msgstr ""
+
+#: ../src/command/vis_tool.cpp
+msgid "Subtitle mask"
+msgstr ""
+
+#: ../src/dialog_ass_templates.cpp
+msgid "Subtitle templates"
+msgstr ""
+
+#: ../src/dialog_ass_templates.cpp
+msgid "Template name"
+msgstr ""
+
+#: ../src/subs_edit_box.cpp
+msgid "Templates"
+msgstr ""
+
+#: ../src/visual_tool_screen_mask.cpp
+msgid "The color button uses the shared palette, eyedropper, recent colors, and frequently used project colors."
+msgstr ""
+
+#: ../src/preferences.cpp
+msgid "Theme"
+msgstr ""
+
+#: ../src/ass_template_store.cpp
+msgid "Time/acceleration"
+msgstr ""
+
+#: ../src/command/grid.cpp
+msgid "Toggle the logical group containing the selected subtitle"
+msgstr ""
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Transform"
+msgstr ""
+
+#: ../src/dialog_ass_templates.cpp
+msgid "Uncategorized"
+msgstr ""
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Underline"
+msgstr ""
+
+#: ../src/dialog_ass_templates.cpp
+msgid "Update project subtitle templates"
+msgstr ""
+
+#: ../src/command/vis_tool.cpp
+msgid "Use standard ASS inverse clipping to hide part of the selected subtitle from the current frame"
+msgstr ""
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Vector clip"
+msgstr ""
+
+#: ../src/visual_tool_drag.cpp
+msgid "When enabled, dragging and arrow-key nudging creates a held state from the current exact video frame"
+msgstr ""
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Wrapping style"
+msgstr ""
+
+#: ../src/ass_template_store.cpp
+msgid "X outline"
+msgstr ""
+
+#: ../src/ass_block_editor_model.cpp
+msgid "X outline width"
+msgstr ""
+
+#: ../src/ass_block_editor_model.cpp
+msgid "X rotation"
+msgstr ""
+
+#: ../src/ass_block_editor_model.cpp
+msgid "X scale"
+msgstr ""
+
+#: ../src/ass_template_store.cpp
+msgid "X shadow"
+msgstr ""
+
+#: ../src/ass_block_editor_model.cpp
+msgid "X shadow distance"
+msgstr ""
+
+#: ../src/ass_block_editor_model.cpp
+msgid "X shear"
+msgstr ""
+
+#: ../src/ass_template_store.cpp
+msgid "Y outline"
+msgstr ""
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Y outline width"
+msgstr ""
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Y rotation"
+msgstr ""
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Y scale"
+msgstr ""
+
+#: ../src/ass_template_store.cpp
+msgid "Y shadow"
+msgstr ""
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Y shadow distance"
+msgstr ""
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Y shear"
+msgstr ""
+
+#: ../src/dialog_ass_templates.cpp
+msgid "You can edit position, color, font size, animation timing, and text. Leave a value unchanged to keep it."
+msgstr ""
+
+#: ../src/ass_block_editor_model.cpp
+msgid "Z rotation"
+msgstr ""
