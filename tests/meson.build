@@ -17,6 +17,7 @@ tests_src = [
     'support/util.cpp',
 
     'tests/access.cpp',
+    'tests/ass_block_editor_model.cpp',
     'tests/ass_file_roundtrip.cpp',
     'tests/ass_override_ast.cpp',
     'tests/audio.cpp',
@@ -56,6 +57,7 @@ tests_src = [
 
 tests_src += files(
     '../src/ass_attachment.cpp',
+    '../src/ass_block_editor_model.cpp',
     '../src/ass_dialogue.cpp',
     '../src/ass_entry.cpp',
     '../src/ass_file.cpp',

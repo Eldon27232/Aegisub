@@ -33,6 +33,7 @@
 #include <boost/container/map.hpp>
 #include <boost/flyweight/flyweight_fwd.hpp>
 #include <list>
+#include <memory>
 #include <vector>
 
 #include <wx/combobox.h>
@@ -44,12 +45,15 @@
 namespace agi::vfr { class Framerate; }
 namespace agi { struct Context; }
 namespace agi { class Time; }
+namespace ass::blocks { class Model; }
 class AssDialogue;
 class AssStyle;
 class SubsTextEditCtrl;
 class TimeEdit;
 class wxButton;
 class wxCheckBox;
+class wxListCtrl;
+class wxListEvent;
 class wxRadioButton;
 class wxSizer;
 class wxSpinCtrl;
@@ -101,11 +105,16 @@ class SubsEditBox final : public wxPanel {
 	wxRadioButton *by_frame;
 	wxTextCtrl *char_count;
 	wxCheckBox *split_box;
+	wxCheckBox *show_ass_source;
+	wxListCtrl *block_list;
+	wxPanel *block_panel;
+	std::unique_ptr<ass::blocks::Model> block_model;
 
 	wxSizer *top_sizer;
 	wxSizer *middle_right_sizer;
 	wxSizer *middle_left_sizer;
 	wxSizer *bottom_sizer;
+	wxSizer *main_sizer;
 
 	void SetControlsState(bool state);
 	/// @brief Update times of selected lines
@@ -143,6 +152,18 @@ class SubsEditBox final : public wxPanel {
 
 	void OnChange(wxStyledTextEvent &event);
 	void OnKeyDown(wxKeyEvent &event);
+	void OnBlockNew(wxCommandEvent&);
+	void OnBlockActivate(wxListEvent&);
+	void OnBlockContext(wxListEvent&);
+	void OnBlockKeyDown(wxKeyEvent&);
+	void OnShowAssSource(wxCommandEvent&);
+	void RefreshBlocks();
+	void ApplyBlockChange(wxString const& desc);
+	std::vector<size_t> SelectedBlocks() const;
+	void CopyBlocks();
+	void CutBlocks();
+	void PasteBlocks();
+	void DeleteBlocks();
 
 	void OnActiveLineChanged(AssDialogue *new_line);
 	void OnSelectedSetChanged();
