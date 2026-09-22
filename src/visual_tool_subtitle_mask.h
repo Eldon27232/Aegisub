@@ -10,15 +10,23 @@
 #include "visual_tool.h"
 
 #include <vector>
+#include <memory>
 
 class wxCommandEvent;
 class wxToolBar;
+class wxMiniFrame;
+class wxChoice;
+class wxStaticText;
 
 class VisualToolSubtitleMask final : public VisualToolBase {
 	using Point = ass::subtitle_mask::Point;
-	enum class ShapeMode { Rectangle, Polygon };
+	enum class ShapeMode { Rectangle, Polygon, Select };
 
 	wxToolBar *toolbar = nullptr;
+	wxMiniFrame *panel = nullptr;
+	wxChoice *shape_choice = nullptr;
+	wxStaticText *frame_label = nullptr;
+	std::shared_ptr<int> panel_lifetime = std::make_shared<int>(0);
 	ShapeMode shape_mode = ShapeMode::Rectangle;
 	std::vector<Point> points;
 	std::vector<Point> pending_points;
@@ -29,6 +37,8 @@ class VisualToolSubtitleMask final : public VisualToolBase {
 	int dragged_point = -1;
 
 	void DoRefresh() override;
+	void OnFrameChanged() override;
+	void FinishPolygon();
 	void OnTool(wxCommandEvent& event);
 	void ApplyMask(std::vector<Point> const& new_points, bool rectangle, wxString const& message);
 	void CancelMask();
@@ -42,6 +52,7 @@ class VisualToolSubtitleMask final : public VisualToolBase {
 
 public:
 	VisualToolSubtitleMask(VideoDisplay *parent, agi::Context *context);
+	~VisualToolSubtitleMask() override;
 	void SetToolbar(wxToolBar *toolbar) override;
 	void SetSubTool(int subtool) override;
 	int GetSubTool() override;
