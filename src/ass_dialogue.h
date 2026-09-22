@@ -38,6 +38,8 @@
 #include <boost/flyweight.hpp>
 #include <vector>
 
+namespace ass::ast { class Document; }
+
 enum class AssBlockType {
 	PLAIN,
 	COMMENT,
@@ -160,6 +162,8 @@ public:
 
 	/// Parse text as ASS and return block information
 	std::vector<std::unique_ptr<AssDialogueBlock>> ParseTags() const;
+	/// Parse the Text field into the lossless structured editing representation.
+	ass::ast::Document ParseTextAST() const;
 
 	/// Strip all ASS tags from the text
 	void StripTags();
@@ -169,6 +173,8 @@ public:
 
 	/// Update the text of the line from parsed blocks
 	void UpdateText(std::vector<std::unique_ptr<AssDialogueBlock>>& blocks);
+	/// Update Text from the lossless structured editing representation.
+	void UpdateText(ass::ast::Document const& document);
 	std::string GetEntryData() const;
 
 	/// Does this line collide with the passed line?
