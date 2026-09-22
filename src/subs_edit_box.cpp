@@ -35,6 +35,10 @@
 #include "subs_edit_box.h"
 
 #include "ass_block_editor_model.h"
+#include "ass_override_ast.h"
+#include "ass_style.h"
+#include "colour_picker_model.h"
+#include "dialogs.h"
 #include "ass_dialogue.h"
 #include "ass_file.h"
 #include "base_grid.h"
@@ -65,6 +69,14 @@
 #include <unordered_set>
 
 #include <wx/bmpbuttn.h>
+#include <wx/choice.h>
+#include <wx/dcbuffer.h>
+#include <wx/dcmemory.h>
+#include <wx/scrolwin.h>
+#include <wx/stattext.h>
+#include <wx/wrapsizer.h>
+#include <wx/weakref.h>
+#include <cmath>
 #include <wx/button.h>
 #include <wx/checkbox.h>
 #include <wx/clipbrd.h>
@@ -254,7 +266,8 @@ SubsEditBox::SubsEditBox(wxWindow *parent, agi::Context *context)
 	split_box = new wxCheckBox(this,-1,_("Show Original"));
 	split_box->SetToolTip(_("Show the contents of the subtitle line when it was first selected above the edit box. This is sometimes useful when editing subtitles or translating subtitles into another language."));
 	split_box->Bind(wxEVT_CHECKBOX, &SubsEditBox::OnSplit, this);
-	middle_right_sizer->Add(split_box, wxSizerFlags().Center().Left());
+	auto *editing_modes = new wxBoxSizer(wxHORIZONTAL);
+	editing_modes->Add(split_box, wxSizerFlags().Center());
 	auto *frame_segments = new wxCheckBox(this, wxID_ANY, _("Segment by frame"));
 	frame_segments->SetName("frame-segments-toggle");
 	frame_segments->SetValue(OPT_GET("Tool/Visual/Frame Segments")->GetBool());
@@ -262,13 +275,14 @@ SubsEditBox::SubsEditBox(wxWindow *parent, agi::Context *context)
 	frame_segments->Bind(wxEVT_CHECKBOX, [frame_segments](wxCommandEvent&) {
 		OPT_SET("Tool/Visual/Frame Segments")->SetBool(frame_segments->GetValue());
 	});
-	middle_right_sizer->Add(frame_segments, wxSizerFlags().Center().Border(wxLEFT, 8));
+	editing_modes->Add(frame_segments, wxSizerFlags().Center().Border(wxLEFT, 8));
 
 	// Main sizer
 	main_sizer = new wxBoxSizer(wxVERTICAL);
 	main_sizer->Add(top_sizer,0,wxEXPAND | wxALL,3);
 	main_sizer->Add(middle_left_sizer,0,wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM,3);
 	main_sizer->Add(middle_right_sizer,0,wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM,3);
+	main_sizer->Add(editing_modes, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 3);
 
 	// Block editor and optional raw ASS source
 	block_panel = new wxPanel(this, wxID_ANY);
@@ -286,12 +300,12 @@ SubsEditBox::SubsEditBox(wxWindow *parent, agi::Context *context)
 	block_header->Add(show_ass_source, wxSizerFlags().Center());
 	block_sizer->Add(block_header, wxSizerFlags().Expand().Border(wxBOTTOM, 3));
 
-	block_list = new wxListCtrl(block_panel, wxID_ANY, wxDefaultPosition, FromDIP(wxSize(300, 82)),
-		wxLC_REPORT | wxLC_HRULES | wxLC_VRULES);
-	block_list->InsertColumn(0, _("Feature block"));
-	block_list->InsertColumn(1, _("ASS content"));
-	block_list->InsertColumn(2, _("Category"));
-	block_list->SetToolTip(_("Click to select; Ctrl/Shift for multiple selection; double-click to edit; supports copy, cut, paste, and Delete"));
+	block_list = new wxScrolledWindow(block_panel, wxID_ANY, wxDefaultPosition,
+		FromDIP(wxSize(300, 160)), wxVSCROLL | wxTAB_TRAVERSAL);
+	block_list->SetName("ass-block-workspace");
+	block_list->SetScrollRate(0, FromDIP(18));
+	block_list->SetSizer(new wxBoxSizer(wxVERTICAL));
+	block_list->Bind(wxEVT_SIZE, [this](wxSizeEvent& event) { LayoutBlocks(); event.Skip(); });
 	block_sizer->Add(block_list, wxSizerFlags(1).Expand());
 	block_panel->SetSizer(block_sizer);
 	main_sizer->Add(block_panel, 1, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 3);
@@ -321,8 +335,7 @@ SubsEditBox::SubsEditBox(wxWindow *parent, agi::Context *context)
 	new_block->Bind(wxEVT_BUTTON, &SubsEditBox::OnBlockNew, this);
 	templates->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { ShowAssTemplateManager(this, c); });
 	show_ass_source->Bind(wxEVT_CHECKBOX, &SubsEditBox::OnShowAssSource, this);
-	block_list->Bind(wxEVT_LIST_ITEM_ACTIVATED, &SubsEditBox::OnBlockActivate, this);
-	block_list->Bind(wxEVT_LIST_ITEM_RIGHT_CLICK, &SubsEditBox::OnBlockContext, this);
+
 	block_list->Bind(wxEVT_CHAR_HOOK, &SubsEditBox::OnBlockKeyDown, this);
 
 	Bind(wxEVT_TEXT, &SubsEditBox::OnLayerEnter, this, layer->GetId());
@@ -550,38 +563,255 @@ void SubsEditBox::OnKeyDown(wxKeyEvent &event) {
 }
 
 std::vector<size_t> SubsEditBox::SelectedBlocks() const {
-	std::vector<size_t> result;
-	long row = -1;
-	while ((row = block_list->GetNextItem(row, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED)) != -1)
-		result.push_back(static_cast<size_t>(row));
-	return result;
+	return block_selection;
+}
+
+void SubsEditBox::LayoutBlocks() {
+	if (laying_out_blocks || !block_list->GetSizer()) return;
+	laying_out_blocks = true;
+	int width = std::max(100, block_list->GetClientSize().x - FromDIP(8));
+	for (auto *card : block_cards) {
+		for (auto *child : card->GetChildren()) {
+			if (auto *text = dynamic_cast<wxTextCtrl*>(child))
+				text->SetMinSize(wxSize(std::min(FromDIP(340), width - FromDIP(24)), -1));
+		}
+		auto *row = static_cast<wxWrapSizer*>(card->GetSizer());
+		auto size = row->CalcMinSizeFromKnownDirection(wxHORIZONTAL, width, -1);
+		card->SetMinSize(wxSize(0, size.y));
+	}
+	block_list->Layout();
+	block_list->FitInside();
+	laying_out_blocks = false;
+}
+
+void SubsEditBox::PaintBlockSelection() {
+	for (size_t i = 0; i < block_cards.size(); ++i) {
+		auto *card = block_cards[i];
+		bool selected = std::find(block_selection.begin(), block_selection.end(), i) != block_selection.end();
+		auto const& palette = theme::GetPalette();
+		card->SetBackgroundColour(selected ? palette.selection : palette.control_background);
+		card->SetForegroundColour(selected ? palette.selection_text : palette.text);
+		for (auto *child : card->GetChildren()) {
+			if (dynamic_cast<wxStaticText*>(child)) {
+				child->SetBackgroundColour(card->GetBackgroundColour());
+				child->SetForegroundColour(card->GetForegroundColour());
+			}
+		}
+		card->Refresh();
+	}
+}
+
+void SubsEditBox::SelectBlock(size_t row, bool control, bool shift) {
+	if (row >= block_cards.size()) return;
+	if (shift) {
+		if (!control) block_selection.clear();
+		for (size_t i = std::min(row, block_anchor); i <= std::max(row, block_anchor); ++i)
+			block_selection.push_back(i);
+	}
+	else if (control) {
+		auto it = std::find(block_selection.begin(), block_selection.end(), row);
+		if (it == block_selection.end()) block_selection.push_back(row);
+		else block_selection.erase(it);
+		block_anchor = row;
+	}
+	else { block_selection = {row}; block_anchor = row; }
+	std::sort(block_selection.begin(), block_selection.end());
+	block_selection.erase(std::unique(block_selection.begin(), block_selection.end()), block_selection.end());
+	PaintBlockSelection();
 }
 
 void SubsEditBox::RefreshBlocks() {
+	if (changing_blocks) return;
+	auto *focus = wxWindow::FindFocus();
+	bool restore_selection_focus = focus == block_list || std::find(block_cards.begin(), block_cards.end(), focus) != block_cards.end();
+	++block_generation;
+	auto generation = block_generation;
 	block_list->Freeze();
-	block_list->DeleteAllItems();
+	block_cards.clear();
+	block_list->GetSizer()->Clear(true);
 	auto const& items = block_model->Items();
+	block_selection.erase(std::remove_if(block_selection.begin(), block_selection.end(),
+		[&](size_t n) { return n >= items.size(); }), block_selection.end());
 	for (size_t i = 0; i < items.size(); ++i) {
-		auto const& item = items[i];
-		long row = block_list->InsertItem(static_cast<long>(i), to_wx(item.label));
-		block_list->SetItem(row, 1, to_wx(item.source));
-		block_list->SetItem(row, 2, to_wx(item.category));
+		auto item = items[i];
+		auto *card = new wxPanel(block_list, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTAB_TRAVERSAL);
+		card->SetName("ass-block-" + to_wx(item.label));
+		card->SetBackgroundStyle(wxBG_STYLE_PAINT);
+		block_cards.push_back(card);
+		card->Bind(wxEVT_PAINT, [this, card, i](wxPaintEvent&) {
+			wxAutoBufferedPaintDC dc(card);
+			dc.SetBackground(wxBrush(theme::GetPalette().window_background)); dc.Clear();
+			bool selected = std::find(block_selection.begin(), block_selection.end(), i) != block_selection.end();
+			dc.SetBrush(wxBrush(card->GetBackgroundColour()));
+			dc.SetPen(wxPen(selected ? theme::GetPalette().accent : theme::GetPalette().border, selected ? 2 : 1));
+			dc.DrawRoundedRectangle(card->GetClientRect().Deflate(1), FromDIP(7));
+		});
+		auto select = [this, i, card](wxMouseEvent& e) {
+			SelectBlock(i, e.CmdDown(), e.ShiftDown()); card->SetFocusIgnoringChildren();
+		};
+		card->Bind(wxEVT_LEFT_DOWN, select);
+		card->Bind(wxEVT_CONTEXT_MENU, [this,i](wxContextMenuEvent&) { OnBlockContext(i); });
+		auto *row = new wxWrapSizer(wxHORIZONTAL);
+		auto *title = new wxStaticText(card, wxID_ANY, to_wx(item.label));
+		title->SetFont(title->GetFont().Bold()); title->Bind(wxEVT_LEFT_DOWN, select);
+		row->Add(title, wxSizerFlags().CenterVertical().Border(wxALL, 8));
+		auto save = [this, i, generation](std::string const& source, bool refresh = false) {
+			if (generation != block_generation || source.empty()) return;
+			auto previous = block_model->Items();
+			if (!block_model->Replace(i, source)) return;
+			ApplyBlockChange(_("Edit ASS block"), false);
+			auto const& current = block_model->Items();
+			bool same_structure = previous.size() == current.size() && std::equal(previous.begin(), previous.end(), current.begin(),
+				[](auto const& left, auto const& right) { return left.kind == right.kind && left.label == right.label; });
+			if (!same_structure || refresh) {
+				// Raw/text input can insert several tags. Invalidate stale card indices
+				// immediately, then rebuild after the current input event has returned.
+				auto next_generation = ++block_generation;
+				CallAfter([this,next_generation] { if (next_generation == block_generation) RefreshBlocks(); });
+			}
+		};
+		auto field = [card, row](wxString const& label, wxWindow *control) {
+			auto *pair = new wxBoxSizer(wxHORIZONTAL);
+			if (!label.empty()) pair->Add(new wxStaticText(card, wxID_ANY, label), wxSizerFlags().CenterVertical().Border(wxRIGHT, 4));
+			pair->Add(control, wxSizerFlags().CenterVertical());
+			row->Add(pair, wxSizerFlags().CenterVertical().Border(wxALL, 5));
+		};
+		if (item.kind == ass::blocks::ItemKind::Tag) {
+			auto state = std::make_shared<ass::ast::OverrideBlock>(ass::ast::OverrideBlock::Parse(item.source, false));
+			std::function<void(ass::ast::OverrideNode*, std::vector<size_t>)> controls;
+			controls = [&, state, save](ass::ast::OverrideNode *node, std::vector<size_t> path) {
+				if (!node) return;
+				auto name = node->Name();
+				if (!path.empty()) {
+					ass::blocks::Model label; label.SetSource("{" + node->Serialize() + "}");
+					row->Add(new wxStaticText(card, wxID_ANY, label.Items().empty() ? _("Raw ASS") : to_wx(label.Items()[0].label)), wxSizerFlags().CenterVertical().Border(wxALL, 6));
+				}
+				auto set = [state, node, save](size_t arg, std::string value) { node->SetArgument(arg, std::move(value)); save(state->Serialize()); };
+				auto args = node->Arguments();
+				if (node->Kind() == ass::ast::OverrideNodeKind::Raw || !node->IsKnownTag()) {
+					auto *raw = new wxTextCtrl(card, wxID_ANY, to_wx(node->Serialize()), wxDefaultPosition, FromDIP(wxSize(260,-1)));
+					field(_("Raw ASS"),raw);
+					raw->Bind(wxEVT_KILL_FOCUS, [raw,node,state,save](wxFocusEvent& event) {
+						event.Skip(); node->SetRaw(from_wx(raw->GetValue())); save(state->Serialize(), true);
+					});
+					return;
+				}
+				if (name == "\\an" || name == "\\a") {
+					auto *choice = new wxChoice(card, wxID_ANY);
+					for (auto label : {_("Top left"),_("Top"),_("Top right"),_("Left"),_("Center"),_("Right"),_("Bottom left"),_("Bottom"),_("Bottom right")}) choice->Append(label);
+					long value=2; if(!args.empty()) to_wx(args[0]).ToLong(&value);
+					if(name == "\\a") value=AssStyle::SsaToAss(value);
+					int map[]={7,8,9,4,5,6,1,2,3}; for(int n=0;n<9;++n) if(map[n]==value) choice->SetSelection(n);
+					choice->SetName("block-alignment"); field("",choice);
+					choice->Bind(wxEVT_CHOICE,[choice,set,name](wxCommandEvent&) {int map[]={7,8,9,4,5,6,1,2,3}; int v=map[choice->GetSelection()]; set(0,std::to_string(name=="\\a"?AssStyle::AssToSsa(v):v));}); return;
+				}
+				if (name == "\\c" || name == "\\1c" || name == "\\2c" || name == "\\3c" || name == "\\4c") {
+					auto *button = new wxButton(card, wxID_ANY, "", wxDefaultPosition, FromDIP(wxSize(70,28)));
+					auto swatch = [button](agi::Color value) {
+						wxBitmap bitmap(button->FromDIP(38), button->FromDIP(16));
+						wxMemoryDC dc(bitmap); dc.SetBackground(wxBrush(to_wx(value))); dc.Clear(); dc.SelectObject(wxNullBitmap);
+						button->SetBitmap(bitmap);
+					};
+					swatch(block_model->GetColour(i, path));
+					button->SetName("block-color"); field("",button);
+					button->Bind(wxEVT_BUTTON, [this, button, swatch, path, i, generation](wxCommandEvent&) {
+						auto baseline = *block_model;
+						wxWeakRef<SubsEditBox> weak(this);
+						ShowColourPopup(button, baseline.GetColour(i, path), [weak,swatch,path,i,generation,baseline](agi::Color value) {
+							if (!weak || generation != weak->block_generation) return;
+							*weak->block_model = baseline;
+							if (!weak->block_model->SetColour(i, path, value)) return;
+							swatch(value);
+							weak->ApplyBlockChange(_("Edit ASS block"), false);
+						}, c, true, [weak,generation] {
+							if (weak) weak->CallAfter([weak,generation] { if (weak && generation == weak->block_generation) weak->RefreshBlocks(); });
+						});
+					}); return;
+				}
+				if ((name=="\\b" || name=="\\i" || name=="\\u" || name=="\\s") && (args.empty() || args[0]=="0" || args[0]=="1" || args[0]=="-1")) {
+					auto *check = new wxCheckBox(card,wxID_ANY,_("Enabled")); check->SetValue(!args.empty() && args[0]!="0"); field("",check);
+					check->Bind(wxEVT_CHECKBOX,[check,set](wxCommandEvent&) {set(0,check->GetValue()?"1":"0");}); return;
+				}
+				if (name == "\\q") {
+					auto *choice = new wxChoice(card, wxID_ANY);
+					for (auto label : {_("Balanced, wider first line"), _("Wrap at line end"), _("No automatic wrapping"), _("Balanced, wider last line")}) choice->Append(label);
+					long value=0; if(!args.empty()) to_wx(args[0]).ToLong(&value);
+					choice->SetSelection(std::clamp(int(value),0,3)); field("",choice);
+					choice->Bind(wxEVT_CHOICE,[choice,set](wxCommandEvent&) {set(0,std::to_string(choice->GetSelection()));}); return;
+				}
+				bool alpha = name=="\\alpha" || name=="\\1a" || name=="\\2a" || name=="\\3a" || name=="\\4a";
+				if(name=="\\t" && node->Transform()) {
+					// Expand only the private UI copy; opening the editor never rewrites the source.
+					std::string start="0",end=std::to_string(line?int(line->End)-int(line->Start):1000),accel="1";
+					if(args.size()==2) accel=args[0];
+					if(args.size()>=3) {start=args[0];end=args[1];}
+					if(args.size()==4) accel=args[2];
+					node->SetArguments({start,end,accel,node->Transform()->Serialize()},true); args=node->Arguments();
+				}
+				if(name=="\\move" && args.size()==4) { args.push_back("0"); args.push_back(std::to_string(line?int(line->End)-int(line->Start):1000)); }
+				size_t count = node->Transform() ? args.size()-1 : std::max<size_t>(1,args.size());
+				for(size_t a=0;a<count;++a) {
+					wxString label;
+					if(name=="\\pos" || name=="\\org") label=a?"Y":"X";
+					else if(name=="\\move") {wxString labels[]={_("From X"),_("From Y"),_("To X"),_("To Y"),_("Start (ms)"),_("End (ms)")}; if(a<6) label=labels[a];}
+					else if(name=="\\t") {wxString labels[]={_("Start (ms)"),_("End (ms)"),_("Acceleration")}; if(a<3)label=labels[a];}
+					else if(name=="\\fad") label=a?_("Fade out (ms)"):_("Fade in (ms)");
+					else if(name=="\\fade") { wxString labels[]={_("Start opacity (%)"),_("Hold opacity (%)"),_("End opacity (%)"),_("Fade in start (ms)"),_("Fade in end (ms)"),_("Fade out start (ms)"),_("Fade out end (ms)")}; if(a<7) label=labels[a]; }
+					else if(name=="\\fscx" || name=="\\fscy") label="%";
+					else if(name=="\\frx" || name=="\\fry" || name=="\\frz" || name=="\\fr") label=_("Degrees");
+					else if(name=="\\k" || name=="\\K" || name=="\\kf" || name=="\\ko" || name=="\\kt") label=_("Centiseconds");
+					else if(count>1) label=wxString::Format("%s %d",_("Parameter"),int(a+1));
+					std::string value=a<args.size()?args[a]:"";
+					double number=0; bool numeric=to_wx(value).ToCDouble(&number);
+					bool fade_alpha = name=="\\fade" && a<3;
+					if (fade_alpha && numeric) number=colour_picker::AssAlphaToOpacity(std::clamp(int(number),0,255));
+					if(alpha) { long n=0; wxString hex=to_wx(value); hex.Replace("&H","");hex.Replace("&","");hex.ToLong(&n,16); number=colour_picker::AssAlphaToOpacity(n);numeric=true;label=_("Opacity (%)"); }
+					if(numeric && name!="\\fn" && name!="\\r") {
+						auto *input=new wxSpinCtrlDouble(card,wxID_ANY,"",wxDefaultPosition,FromDIP(wxSize(94,-1)),wxSP_ARROW_KEYS,(alpha||fade_alpha)?0:-10000000,(alpha||fade_alpha)?100:10000000,number,1);
+						input->SetDigits((alpha||fade_alpha)?0:2); input->SetName("block-parameter-"+to_wx(name.substr(1))+"-"+std::to_string(a));field(label,input);
+						input->Bind(wxEVT_TEXT,[input,set,a,alpha,fade_alpha,node,args,name](wxCommandEvent&) { double n; if(!input->GetTextValue().ToCDouble(&n)||!std::isfinite(n)) return;
+							if(name=="\\move" && node->Arguments().size()==4 && a>=4) node->SetArguments(args,true);
+							set(a,alpha?from_wx(wxString::Format("&H%02X&",colour_picker::OpacityToAssAlpha(std::clamp(int(n),0,100)))):fade_alpha?std::to_string(colour_picker::OpacityToAssAlpha(std::clamp(int(n),0,100))):from_wx(wxString::FromCDouble(n,6))); });
+					}
+					else {
+						auto *input=new wxTextCtrl(card,wxID_ANY,to_wx(value),wxDefaultPosition,FromDIP(wxSize(name=="\\fn"?180:240,-1)));field(label,input);
+						input->Bind(wxEVT_TEXT,[input,set,a](wxCommandEvent&) {set(a,from_wx(input->GetValue()));});
+					}
+				}
+				if (auto *nested = node->Transform()) for (size_t n=0; n<nested->Nodes().size(); ++n) { auto child_path = path; child_path.push_back(n); controls(nested->MutableNode(n), child_path); }
+			};
+			for(size_t n=0;n<state->Nodes().size();++n) controls(state->MutableNode(n),{});
+		}
+		else {
+			auto *text = new wxTextCtrl(card, wxID_ANY, to_wx(item.source), wxDefaultPosition, FromDIP(wxSize(340, -1)));
+			text->SetName(item.kind==ass::blocks::ItemKind::Raw?"block-raw-ass":"block-text"); field("",text);
+			if (item.kind == ass::blocks::ItemKind::Text)
+				text->Bind(wxEVT_TEXT,[text,save](wxCommandEvent&) {save(from_wx(text->GetValue()));});
+			else text->Bind(wxEVT_KILL_FOCUS,[text,save](wxFocusEvent& event) {event.Skip(); save(from_wx(text->GetValue()), true);});
+			text->Bind(wxEVT_KILL_FOCUS,[this,text,i,generation](wxFocusEvent& event) {
+				event.Skip();
+				if (!text->GetValue().empty()) return;
+				CallAfter([this,i,generation] { if(generation==block_generation && block_model->Delete({i})) ApplyBlockChange(_("Delete ASS block")); });
+			});
+		}
+		card->SetSizer(row);
+		block_list->GetSizer()->Add(card,wxSizerFlags().Expand().Border(wxALL,4));
 	}
-	block_list->SetColumnWidth(0, FromDIP(150));
-	block_list->SetColumnWidth(2, FromDIP(90));
-	block_list->SetColumnWidth(1, std::max(FromDIP(180), block_list->GetClientSize().x - FromDIP(250)));
-	block_list->Thaw();
+	PaintBlockSelection();
+	LayoutBlocks(); block_list->Thaw();
+	if (restore_selection_focus) {
+		if (!block_selection.empty()) block_cards[block_selection.front()]->SetFocusIgnoringChildren();
+		else block_list->SetFocusIgnoringChildren();
+	}
 }
 
-void SubsEditBox::ApplyBlockChange(wxString const& desc) {
+void SubsEditBox::ApplyBlockChange(wxString const& desc, bool rebuild) {
+	changing_blocks = true;
 	auto source = block_model->Serialize();
 	edit_ctrl->SetTextTo(source);
-	if (line) {
-		commit_id = -1;
-		CommitText(desc);
-		UpdateCharacterCount(source);
-	}
-	RefreshBlocks();
+	if (line) { CommitText(desc); UpdateCharacterCount(source); }
+	changing_blocks = false;
+	if (rebuild) RefreshBlocks();
 }
 
 void SubsEditBox::OnBlockNew(wxCommandEvent&) {
@@ -594,17 +824,6 @@ void SubsEditBox::OnBlockNew(wxCommandEvent&) {
 	if (!selected.empty()) after = selected.back();
 	if (block_model->Insert(after, *feature))
 		ApplyBlockChange(_("Add ASS block"));
-}
-
-void SubsEditBox::OnBlockActivate(wxListEvent& event) {
-	long row = event.GetIndex();
-	if (row < 0 || static_cast<size_t>(row) >= block_model->Items().size()) return;
-	auto const& item = block_model->Items()[static_cast<size_t>(row)];
-	wxTextEntryDialog dialog(this, _("Edit the ASS content for this block:"), _("Edit ASS block"),
-		to_wx(item.source), wxOK | wxCANCEL | wxCENTRE | wxTE_MULTILINE);
-	dialog.SetSize(FromDIP(wxSize(520, 220)));
-	if (dialog.ShowModal() == wxID_OK && block_model->Replace(static_cast<size_t>(row), from_wx(dialog.GetValue())))
-		ApplyBlockChange(_("Edit ASS block"));
 }
 
 void SubsEditBox::CopyBlocks() {
@@ -643,6 +862,9 @@ void SubsEditBox::DeleteBlocks() {
 }
 
 void SubsEditBox::OnBlockKeyDown(wxKeyEvent& event) {
+	// Editing a field keeps normal text shortcuts; block shortcuts act on the card itself.
+	auto *focus = wxWindow::FindFocus();
+	if (focus && focus != block_list && !dynamic_cast<wxPanel*>(focus)) { event.Skip(); return; }
 	if (event.ControlDown()) {
 		switch (event.GetKeyCode()) {
 			case 'C': CopyBlocks(); return;
@@ -658,9 +880,8 @@ void SubsEditBox::OnBlockKeyDown(wxKeyEvent& event) {
 	event.Skip();
 }
 
-void SubsEditBox::OnBlockContext(wxListEvent& event) {
-	if (event.GetIndex() >= 0 && !(block_list->GetItemState(event.GetIndex(), wxLIST_STATE_SELECTED) & wxLIST_STATE_SELECTED))
-		block_list->SetItemState(event.GetIndex(), wxLIST_STATE_SELECTED, wxLIST_STATE_SELECTED);
+void SubsEditBox::OnBlockContext(size_t row) {
+	if (std::find(block_selection.begin(), block_selection.end(), row) == block_selection.end()) SelectBlock(row, false, false);
 	wxMenu menu;
 	menu.Append(wxID_COPY, _("Copy"));
 	menu.Append(wxID_CUT, _("Cut"));
@@ -683,6 +904,7 @@ void SubsEditBox::OnShowAssSource(wxCommandEvent&) {
 }
 
 void SubsEditBox::OnChange(wxStyledTextEvent &event) {
+	if (changing_blocks) return;
 	if (line && edit_ctrl->GetTextRaw().data() != line->Text.get()) {
 		if (event.GetModificationType() & wxSTC_STARTACTION)
 			commit_id = -1;
