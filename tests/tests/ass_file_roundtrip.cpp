@@ -73,6 +73,7 @@ TEST(ass_file_roundtrip, preserves_unknown_content_while_writing_edited_known_fi
 		"\n"
 		"[Aegisub Project Garbage]\n"
 		"Video File: original-video.mkv\n"
+		"Localization Templates: v1|old:Old:Project:{\\an8}old\n"
 		"Vendor Project Field: keep me\n";
 
 	{
@@ -90,6 +91,7 @@ TEST(ass_file_roundtrip, preserves_unknown_content_while_writing_edited_known_fi
 
 	file.SetScriptInfo("Title", "Updated title");
 	file.Properties.video_file = "updated-video.mkv";
+	file.Properties.localization_templates = "v1|new:New:Project:{\\pos(1,2)}new";
 	file.Styles.front().font = "Updated Font";
 	file.Styles.front().UpdateData();
 	file.Events.front().Text = "Updated dialogue";
@@ -110,6 +112,7 @@ TEST(ass_file_roundtrip, preserves_unknown_content_while_writing_edited_known_fi
 
 	EXPECT_NE(std::string::npos, result.find("Title: Updated title"));
 	EXPECT_NE(std::string::npos, result.find("Video File: updated-video.mkv"));
+	EXPECT_NE(std::string::npos, result.find("Localization Templates: v1|new:New:Project:{\\pos(1,2)}new"));
 	EXPECT_NE(std::string::npos, result.find("Style: Default,Updated Font,"));
 	EXPECT_NE(std::string::npos, result.find("Updated dialogue"));
 	EXPECT_EQ(std::string::npos, result.find("Title: Original title"));
@@ -130,4 +133,5 @@ TEST(ass_file_roundtrip, preserves_unknown_content_while_writing_edited_known_fi
 	EXPECT_EQ("Updated title", reopened.GetScriptInfo("Title"));
 	EXPECT_EQ("retain this value", reopened.GetScriptInfo("Vendor-Key"));
 	EXPECT_EQ("updated-video.mkv", reopened.Properties.video_file);
+	EXPECT_EQ("v1|new:New:Project:{\\pos(1,2)}new", reopened.Properties.localization_templates);
 }
