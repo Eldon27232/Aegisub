@@ -400,9 +400,9 @@ struct grid_swap final : public Command {
 
 struct grid_fold_create final : public Command {
 	CMD_NAME("grid/fold/create")
-	STR_MENU("Create new Fold")
-	STR_DISP("Create new Fold")
-	STR_HELP("Create a new fold collapsing the selected lines into a group")
+	STR_MENU("合并为逻辑字幕组")
+	STR_DISP("合并为逻辑字幕组")
+	STR_HELP("把选中的普通字幕和已有字幕组合并成一个扁平逻辑组")
 	CMD_TYPE(COMMAND_VALIDATE)
 
 	bool Validate(const agi::Context *c) override {
@@ -412,17 +412,18 @@ struct grid_fold_create final : public Command {
 	void operator()(agi::Context *c) override {
 		auto const& sel = c->selectionController->GetSortedSelection();
 		if (sel.size() >= 2) {
-			c->foldController->AddFold(**sel.begin(), **sel.rbegin(), true);
-			c->selectionController->SetSelectionAndActive({ *sel.begin() }, *sel.begin());
+			c->foldController->MergeIntoFlatGroup(sel);
+			auto group = c->foldController->GetFoldLines(**sel.begin());
+			c->selectionController->SetSelectionAndActive(Selection(group.begin(), group.end()), group.front());
 		}
 	}
 };
 
 struct grid_fold_open final : public Command {
 	CMD_NAME("grid/fold/open")
-	STR_MENU("Open Folds")
-	STR_DISP("Open Folds")
-	STR_HELP("Expand the folds under the selected lines")
+	STR_MENU("展开逻辑字幕组")
+	STR_DISP("展开逻辑字幕组")
+	STR_HELP("展开所选字幕所在的逻辑组")
 	CMD_TYPE(COMMAND_VALIDATE)
 
 	bool Validate(const agi::Context *c) override {
@@ -436,9 +437,9 @@ struct grid_fold_open final : public Command {
 
 struct grid_fold_close final : public Command {
 	CMD_NAME("grid/fold/close")
-	STR_MENU("Close Folds")
-	STR_DISP("Close Folds")
-	STR_HELP("Collapse the folds around the selected lines")
+	STR_MENU("收起逻辑字幕组")
+	STR_DISP("收起逻辑字幕组")
+	STR_HELP("收起所选字幕所在的逻辑组")
 	CMD_TYPE(COMMAND_VALIDATE)
 
 	bool Validate(const agi::Context *c) override {
@@ -452,9 +453,9 @@ struct grid_fold_close final : public Command {
 
 struct grid_fold_clear final : public Command {
 	CMD_NAME("grid/fold/clear")
-	STR_MENU("Clear Folds")
-	STR_DISP("Clear Folds")
-	STR_HELP("Remove the folds around the selected lines")
+	STR_MENU("释放整个逻辑字幕组")
+	STR_DISP("释放整个逻辑字幕组")
+	STR_HELP("保留实际 ASS 字幕行，只移除编辑器中的逻辑分组")
 	CMD_TYPE(COMMAND_VALIDATE)
 
 	bool Validate(const agi::Context *c) override {
@@ -468,9 +469,9 @@ struct grid_fold_clear final : public Command {
 
 struct grid_fold_toggle final : public Command {
 	CMD_NAME("grid/fold/toggle")
-	STR_MENU("Toggle Folds")
-	STR_DISP("Toggle Folds")
-	STR_HELP("Open or close the folds around the selected lines")
+	STR_MENU("展开 / 收起逻辑字幕组")
+	STR_DISP("展开 / 收起逻辑字幕组")
+	STR_HELP("切换所选字幕所在逻辑组的展开状态")
 	CMD_TYPE(COMMAND_VALIDATE)
 
 	bool Validate(const agi::Context *c) override {
@@ -479,6 +480,44 @@ struct grid_fold_toggle final : public Command {
 
 	void operator()(agi::Context *c) override {
 		c->foldController->ToggleFoldsAt(c->selectionController->GetSortedSelection());
+	}
+};
+
+struct grid_group_select final : public Command {
+	CMD_NAME("grid/group/select")
+	STR_MENU("选择整个逻辑字幕组")
+	STR_DISP("选择整个逻辑字幕组")
+	STR_HELP("选择当前字幕所在逻辑组的全部实际字幕行")
+	CMD_TYPE(COMMAND_VALIDATE)
+
+	bool Validate(const agi::Context *c) override {
+		return c->selectionController->GetActiveLine() &&
+			c->foldController->AreFoldsAt({c->selectionController->GetActiveLine()});
+	}
+
+	void operator()(agi::Context *c) override {
+		auto *active = c->selectionController->GetActiveLine();
+		if (!active) return;
+		auto group = c->foldController->GetFoldLines(*active);
+		c->selectionController->SetSelectionAndActive(Selection(group.begin(), group.end()), active);
+	}
+};
+
+struct grid_group_release_line final : public Command {
+	CMD_NAME("grid/group/release_line")
+	STR_MENU("从逻辑组释放当前字幕")
+	STR_DISP("从逻辑组释放当前字幕")
+	STR_HELP("只释放当前实际字幕行，必要时把左右剩余部分保留为两个扁平组")
+	CMD_TYPE(COMMAND_VALIDATE)
+
+	bool Validate(const agi::Context *c) override {
+		return c->selectionController->GetSelectedSet().size() == 1 &&
+			c->foldController->AreFoldsAt(c->selectionController->GetSortedSelection());
+	}
+
+	void operator()(agi::Context *c) override {
+		auto *active = c->selectionController->GetActiveLine();
+		if (active) c->foldController->ReleaseLineFromFold(*active);
 	}
 };
 
@@ -542,6 +581,8 @@ namespace cmd {
 		reg(std::make_unique<grid_fold_close>());
 		reg(std::make_unique<grid_fold_toggle>());
 		reg(std::make_unique<grid_fold_clear>());
+		reg(std::make_unique<grid_group_select>());
+		reg(std::make_unique<grid_group_release_line>());
 		reg(std::make_unique<grid_fold_open_all>());
 		reg(std::make_unique<grid_fold_close_all>());
 		reg(std::make_unique<grid_fold_clear_all>());

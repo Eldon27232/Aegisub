@@ -503,6 +503,8 @@ void VideoDisplay::OnContextMenu(wxContextMenuEvent&) {
 }
 
 void VideoDisplay::OnKeyDown(wxKeyEvent &event) {
+	if (tool && tool->OnKeyDown(event))
+		return;
 	hotkey::check("Video", con, event);
 }
 

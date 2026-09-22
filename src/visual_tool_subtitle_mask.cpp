@@ -9,6 +9,7 @@
 #include "ass_dialogue.h"
 #include "ass_file.h"
 #include "compat.h"
+#include "fold_controller.h"
 #include "include/aegisub/context.h"
 #include "libresrc/libresrc.h"
 #include "options.h"
@@ -135,16 +136,22 @@ void VisualToolSubtitleMask::ApplyMask(std::vector<Point> const& new_points, boo
 
 	bool split = plan.split;
 	if (split) {
+		bool was_grouped = active_line->Fold.hasFold() || active_line->Fold.getFoldOpener();
+		bool was_opener = active_line->Fold.hasFold() && !active_line->Fold.isEnd();
+		bool was_ender = active_line->Fold.hasFold() && active_line->Fold.isEnd();
 		auto *before = new AssDialogue(*active_line);
 		before->End = c->videoController->TimeAtFrame(plan.before_end, agi::vfr::END);
 		active_line->Start = c->videoController->TimeAtFrame(plan.active_start, agi::vfr::START);
 		c->ass->Events.insert(c->ass->iterator_to(*active_line), *before);
+		if (was_opener) c->ass->DeleteExtradataValue(*active_line, folds_key);
+		if (was_ender) c->ass->DeleteExtradataValue(*before, folds_key);
+		if (!was_grouped) c->foldController->AddAutomaticFold(*before, *active_line, false);
 	}
 	active_line->Text = std::move(changed);
 	points = new_points;
 
 	int flags = AssFile::COMMIT_DIAG_TEXT;
-	if (split) flags |= AssFile::COMMIT_DIAG_ADDREM | AssFile::COMMIT_DIAG_TIME;
+	if (split) flags |= AssFile::COMMIT_DIAG_ADDREM | AssFile::COMMIT_DIAG_TIME | AssFile::COMMIT_FOLD;
 	file_changed_connection.Block();
 	commit_id = c->ass->Commit(message, flags, split ? -1 : commit_id, split ? nullptr : active_line);
 	file_changed_connection.Unblock();
@@ -163,15 +170,21 @@ void VisualToolSubtitleMask::CancelMask() {
 	if (!plan.valid) return;
 
 	if (plan.split) {
+		bool was_grouped = active_line->Fold.hasFold() || active_line->Fold.getFoldOpener();
+		bool was_opener = active_line->Fold.hasFold() && !active_line->Fold.isEnd();
+		bool was_ender = active_line->Fold.hasFold() && active_line->Fold.isEnd();
 		auto *before = new AssDialogue(*active_line);
 		before->End = c->videoController->TimeAtFrame(plan.before_end, agi::vfr::END);
 		active_line->Start = c->videoController->TimeAtFrame(plan.active_start, agi::vfr::START);
 		c->ass->Events.insert(c->ass->iterator_to(*active_line), *before);
+		if (was_opener) c->ass->DeleteExtradataValue(*active_line, folds_key);
+		if (was_ender) c->ass->DeleteExtradataValue(*before, folds_key);
+		if (!was_grouped) c->foldController->AddAutomaticFold(*before, *active_line, false);
 	}
 	active_line->Text = std::move(changed);
 	points.clear();
 	int flags = AssFile::COMMIT_DIAG_TEXT;
-	if (plan.split) flags |= AssFile::COMMIT_DIAG_ADDREM | AssFile::COMMIT_DIAG_TIME;
+	if (plan.split) flags |= AssFile::COMMIT_DIAG_ADDREM | AssFile::COMMIT_DIAG_TIME | AssFile::COMMIT_FOLD;
 	file_changed_connection.Block();
 	commit_id = c->ass->Commit(_("取消字幕遮挡"), flags, -1, plan.split ? nullptr : active_line);
 	file_changed_connection.Unblock();

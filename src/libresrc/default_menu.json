@@ -22,6 +22,8 @@
         {},
         { "command" : "grid/fold/create" },
         { "command" : "grid/fold/toggle" },
+        { "command" : "grid/group/select" },
+        { "command" : "grid/group/release_line" },
         { "command" : "grid/fold/clear" },
         {},
         { "command" : "edit/line/cut" },

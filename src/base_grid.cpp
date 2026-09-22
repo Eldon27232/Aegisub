@@ -265,21 +265,23 @@ void BaseGrid::SelectRow(int row, bool addToSelected, bool select) {
 	if (row < 0 || (size_t)row >= vis_index_line_map.size()) return;
 
 	AssDialogue *line = vis_index_line_map[row];
+	std::vector<AssDialogue *> lines{line};
+	if (line->Fold.hasFold() && !line->Fold.isEnd() && line->Fold.isFolded())
+		lines = context->foldController->GetFoldLines(*line);
 
 	if (!addToSelected) {
-		context->selectionController->SetSelectedSet(Selection{line});
+		context->selectionController->SetSelectedSet(Selection(lines.begin(), lines.end()));
 		return;
 	}
 
-	bool selected = !!context->selectionController->GetSelectedSet().count(line);
-	if (select != selected) {
-		auto selection = context->selectionController->GetSelectedSet();
+	auto selection = context->selectionController->GetSelectedSet();
+	for (auto *member : lines) {
 		if (select)
-			selection.insert(line);
+			selection.insert(member);
 		else
-			selection.erase(line);
-		context->selectionController->SetSelectedSet(std::move(selection));
+			selection.erase(member);
 	}
+	context->selectionController->SetSelectedSet(std::move(selection));
 }
 
 void BaseGrid::OnSeek() {

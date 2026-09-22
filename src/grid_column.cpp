@@ -219,6 +219,8 @@ struct GridColumnEndTime final : GridColumnTime {
 	COLUMN_DESCRIPTION(_("End Time"))
 
 	wxString Value(const AssDialogue *d, const agi::Context *c) const override {
+		if (d->Fold.hasFold() && !d->Fold.isEnd() && d->Fold.isFolded() && d->Fold.getFoldCounterpart())
+			d = d->Fold.getFoldCounterpart();
 		if (by_frame)
 			return std::to_wstring(c->videoController->FrameAtTime(d->End, agi::vfr::END));
 		return to_wx(d->End.GetAssFormatted());

@@ -23,6 +23,8 @@
 #include "ass_dialogue.h"
 #include "ass_file.h"
 #include "compat.h"
+#include "fold_controller.h"
+#include "frame_segment_model.h"
 #include "include/aegisub/context.h"
 #include "libresrc/libresrc.h"
 #include "options.h"
@@ -37,6 +39,13 @@
 
 #include <wx/toolbar.h>
 
+namespace {
+enum {
+	TOOL_MOVE_OR_POS = wxID_HIGHEST + 6300,
+	TOOL_FRAME_SEGMENTS
+};
+}
+
 static const DraggableFeatureType DRAG_ORIGIN = DRAG_BIG_TRIANGLE;
 static const DraggableFeatureType DRAG_START = DRAG_BIG_SQUARE;
 static const DraggableFeatureType DRAG_END = DRAG_BIG_CIRCLE;
@@ -44,6 +53,7 @@ static const DraggableFeatureType DRAG_END = DRAG_BIG_CIRCLE;
 VisualToolDrag::VisualToolDrag(VideoDisplay *parent, agi::Context *context)
 : VisualTool<VisualToolDragDraggableFeature>(parent, context)
 {
+	segment_by_frame = OPT_GET("Tool/Visual/Frame Segments")->GetBool();
 	connections.push_back(c->selectionController->AddSelectionListener(&VisualToolDrag::OnSelectedSetChanged, this));
 	auto const& sel_set = c->selectionController->GetSelectedSet();
 	selection.insert(begin(selection), begin(sel_set), end(sel_set));
@@ -51,8 +61,13 @@ VisualToolDrag::VisualToolDrag(VideoDisplay *parent, agi::Context *context)
 
 void VisualToolDrag::SetToolbar(wxToolBar *tb) {
 	toolbar = tb;
+	move_button_id = TOOL_MOVE_OR_POS;
+	segment_button_id = TOOL_FRAME_SEGMENTS;
 	toolbar->AddSeparator();
-	toolbar->AddTool(-1, _("Toggle between \\move and \\pos"), GETBUNDLE(visual_move_conv_move, OPT_GET("App/Toolbar Icon Size")->GetInt()));
+	toolbar->AddTool(move_button_id, _("Toggle between \\move and \\pos"), GETBUNDLE(visual_move_conv_move, OPT_GET("App/Toolbar Icon Size")->GetInt()));
+	toolbar->AddTool(segment_button_id, _("按帧分段"), GETBUNDLE(visual_move, OPT_GET("App/Toolbar Icon Size")->GetInt()),
+		_("开启后，拖动和方向键微调会从当前真实视频帧开始建立 Hold 状态"), wxITEM_CHECK);
+	toolbar->ToggleTool(segment_button_id, segment_by_frame);
 	toolbar->Realize();
 	toolbar->Show(true);
 
@@ -75,7 +90,14 @@ void VisualToolDrag::UpdateToggleButtons() {
 	button_is_move = to_move;
 }
 
-void VisualToolDrag::OnSubTool(wxCommandEvent &) {
+void VisualToolDrag::OnSubTool(wxCommandEvent &event) {
+	if (event.GetId() == segment_button_id) {
+		segment_by_frame = toolbar->GetToolState(segment_button_id);
+		OPT_SET("Tool/Visual/Frame Segments")->SetBool(segment_by_frame);
+		return;
+	}
+	if (event.GetId() != move_button_id) return;
+
 	// Toggle \move <-> \pos
 	VideoController *vc = c->videoController.get();
 	for (auto line : selection) {
@@ -275,6 +297,7 @@ void VisualToolDrag::MakeFeatures(AssDialogue *diag, feature_list::iterator pos)
 
 bool VisualToolDrag::InitializeDrag(Feature *feature) {
 	primary = feature;
+	pending_segment_change = false;
 
 	// Set time of clicked feature to the current frame and shift all other
 	// selected features by the same amount
@@ -288,7 +311,37 @@ bool VisualToolDrag::InitializeDrag(Feature *feature) {
 	return true;
 }
 
+bool VisualToolDrag::EnsureFrameSegment(Feature *feature) {
+	if (!segment_by_frame || !feature || !feature->line) return false;
+	auto *line = feature->line;
+	int start = c->videoController->FrameAtTime(line->Start, agi::vfr::START);
+	int end = c->videoController->FrameAtTime(line->End, agi::vfr::END);
+	auto plan = ass::frame_segment::PlanStateChange(start, end, frame_number);
+	if (!plan.valid || !plan.split) return false;
+
+	bool was_grouped = line->Fold.hasFold() || line->Fold.getFoldOpener();
+	bool was_opener = line->Fold.hasFold() && !line->Fold.isEnd();
+	bool was_ender = line->Fold.hasFold() && line->Fold.isEnd();
+	auto *before = new AssDialogue(*line);
+	before->End = c->videoController->TimeAtFrame(plan.before_end, agi::vfr::END);
+	line->Start = c->videoController->TimeAtFrame(plan.active_start, agi::vfr::START);
+	c->ass->Events.insert(c->ass->iterator_to(*line), *before);
+
+	// A copied fold delimiter must stay on only one physical line. This keeps
+	// an existing logical group flat while its segment count grows.
+	if (was_opener)
+		c->ass->DeleteExtradataValue(*line, folds_key);
+	if (was_ender)
+		c->ass->DeleteExtradataValue(*before, folds_key);
+	if (!was_grouped)
+		c->foldController->AddAutomaticFold(*before, *line, false);
+
+	pending_segment_change = true;
+	return true;
+}
+
 void VisualToolDrag::UpdateDrag(Feature *feature) {
+	EnsureFrameSegment(feature);
 	if (feature->type == DRAG_ORIGIN) {
 		SetOverride(feature->line, "\\org", ToScriptCoords(feature->pos).PStr());
 		return;
@@ -305,6 +358,40 @@ void VisualToolDrag::UpdateDrag(Feature *feature) {
 			, ToScriptCoords(feature->pos).Str()
 			, ToScriptCoords(end_feature->pos).Str()
 			, feature->time , end_feature->time));
+}
+
+void VisualToolDrag::Commit(wxString message) {
+	file_changed_connection.Block();
+	if (message.empty())
+		message = segment_by_frame ? _("按帧调整字幕位置") : _("visual typesetting");
+	int flags = AssFile::COMMIT_DIAG_TEXT;
+	if (pending_segment_change)
+		flags |= AssFile::COMMIT_DIAG_ADDREM | AssFile::COMMIT_DIAG_TIME | AssFile::COMMIT_FOLD;
+	commit_id = c->ass->Commit(message, flags, commit_id);
+	pending_segment_change = false;
+	file_changed_connection.Unblock();
+}
+
+bool VisualToolDrag::OnKeyDown(wxKeyEvent &event) {
+	if (!primary || event.CmdDown() || event.AltDown() || event.ShiftDown()) return false;
+	int dx = 0;
+	int dy = 0;
+	switch (event.GetKeyCode()) {
+		case WXK_LEFT:  dx = -1; break;
+		case WXK_RIGHT: dx = 1; break;
+		case WXK_UP:    dy = -1; break;
+		case WXK_DOWN:  dy = 1; break;
+		default: return false;
+	}
+
+	auto script_position = ToScriptCoords(primary->pos) + Vector2D(dx, dy);
+	primary->pos = FromScriptCoords(script_position);
+	EnsureFrameSegment(primary);
+	UpdateDrag(primary);
+	Commit(_("字幕位置 1 像素微调"));
+	commit_id = -1;
+	parent->Render();
+	return true;
 }
 
 void VisualToolDrag::OnDoubleClick() {

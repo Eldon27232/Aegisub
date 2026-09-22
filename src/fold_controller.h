@@ -87,6 +87,7 @@ public:
 	// The following functions are only valid directly after a commit.
 	// Their behaviour is undefined as soon as any uncommitted change is made to the Events.
 	AssDialogue *getFoldOpener() const { return parent; }
+	AssDialogue *getFoldCounterpart() const { return counterpart; }
 	AssDialogue *getNextVisible() const { return nextVisible; }
 	int getVisibleRow() const { return visibleRow; }
 };
@@ -145,6 +146,21 @@ public:
 	/// Calling this method should only cause a commit if the fold was
 	/// successfully added.
 	void AddFold(AssDialogue& start, AssDialogue& end, bool collapsed);
+
+	/// Add metadata for a newly-created adjacent segment pair. The caller
+	/// includes COMMIT_FOLD in its own structural commit.
+	void AddAutomaticFold(AssDialogue& start, AssDialogue& end, bool collapsed);
+
+	/// Return all physical ASS lines in the innermost logical group containing
+	/// line. An ungrouped line is returned as a one-element vector.
+	std::vector<AssDialogue *> GetFoldLines(AssDialogue& line) const;
+
+	/// Merge selected ordinary lines and groups into one flat logical group.
+	void MergeIntoFlatGroup(std::vector<AssDialogue *> const& lines);
+
+	/// Release one physical line while keeping the lines on either side in flat
+	/// groups where possible.
+	void ReleaseLineFromFold(AssDialogue& line);
 
 	void ClearAllFolds();
 
