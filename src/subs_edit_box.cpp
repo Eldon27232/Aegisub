@@ -255,6 +255,14 @@ SubsEditBox::SubsEditBox(wxWindow *parent, agi::Context *context)
 	split_box->SetToolTip(_("Show the contents of the subtitle line when it was first selected above the edit box. This is sometimes useful when editing subtitles or translating subtitles into another language."));
 	split_box->Bind(wxEVT_CHECKBOX, &SubsEditBox::OnSplit, this);
 	middle_right_sizer->Add(split_box, wxSizerFlags().Center().Left());
+	auto *frame_segments = new wxCheckBox(this, wxID_ANY, _("Segment by frame"));
+	frame_segments->SetName("frame-segments-toggle");
+	frame_segments->SetValue(OPT_GET("Tool/Visual/Frame Segments")->GetBool());
+	frame_segments->SetToolTip(_("When enabled, dragging and arrow-key nudging creates a held state from the current exact video frame"));
+	frame_segments->Bind(wxEVT_CHECKBOX, [frame_segments](wxCommandEvent&) {
+		OPT_SET("Tool/Visual/Frame Segments")->SetBool(frame_segments->GetValue());
+	});
+	middle_right_sizer->Add(frame_segments, wxSizerFlags().Center().Border(wxLEFT, 8));
 
 	// Main sizer
 	main_sizer = new wxBoxSizer(wxVERTICAL);
@@ -334,6 +342,9 @@ SubsEditBox::SubsEditBox(wxWindow *parent, agi::Context *context)
 		context->selectionController->AddActiveLineListener(&SubsEditBox::OnActiveLineChanged, this),
 		context->selectionController->AddSelectionListener(&SubsEditBox::OnSelectedSetChanged, this),
 		context->initialLineState->AddChangeListener(&SubsEditBox::OnLineInitialTextChanged, this),
+		OPT_SUB("Tool/Visual/Frame Segments", [frame_segments](agi::OptionValue const& value) {
+			frame_segments->SetValue(value.GetBool());
+		}),
 	 });
 
 	context->textSelectionController->SetControl(edit_ctrl);
