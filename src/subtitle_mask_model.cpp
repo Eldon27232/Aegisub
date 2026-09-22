@@ -67,18 +67,7 @@ void erase_direct_clips(ast::OverrideBlock& block, bool include_normal_clip) {
 } // namespace
 
 StateChangePlan PlanStateChange(int line_start_frame, int line_end_frame, int current_frame) {
-	StateChangePlan result;
-	if (line_end_frame < line_start_frame || current_frame < line_start_frame || current_frame > line_end_frame)
-		return result;
-	result.valid = true;
-	result.active_start = current_frame;
-	result.active_end = line_end_frame;
-	if (current_frame > line_start_frame) {
-		result.split = true;
-		result.before_start = line_start_frame;
-		result.before_end = current_frame - 1;
-	}
-	return result;
+	return frame_segment::PlanStateChange(line_start_frame, line_end_frame, current_frame);
 }
 
 std::string SetInverseClip(std::string_view source, std::vector<Point> const& points, bool rectangle) {

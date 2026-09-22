@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include "frame_segment_model.h"
 #include "screen_mask_model.h"
 
 #include <string>
@@ -16,14 +17,7 @@ namespace ass::subtitle_mask {
 
 using Point = screen_mask::Point;
 
-struct StateChangePlan {
-	bool valid = false;
-	bool split = false;
-	int before_start = 0;
-	int before_end = -1;
-	int active_start = 0;
-	int active_end = 0;
-};
+using StateChangePlan = frame_segment::StateChangePlan;
 
 /// Plan a hold-state change at an exact video frame.
 StateChangePlan PlanStateChange(int line_start_frame, int line_end_frame, int current_frame);
