@@ -28,14 +28,11 @@ class wxWindow;
 namespace agi { struct Context; }
 struct ResampleSettings;
 
-/// @brief Get a color from the user via a color picker dialog
-/// @param parent Parent window
-/// @param original Initial color to select
-/// @param alpha Include controls for alpha
-/// @param callback Function called whenever the selected color changes
-/// @return Did the user accept the new color?
-bool GetColorFromUser(wxWindow *parent, agi::Color original, bool alpha,
-	std::function<void (agi::Color)> callback, agi::Context const *context = nullptr);
+/// Show the shared anchored, non-modal colour panel. Changes apply immediately.
+/// Callbacks stop when the anchor is destroyed; onDismiss can refresh its layout.
+void ShowColourPopup(wxWindow *anchor, agi::Color original,
+	std::function<void(agi::Color)> callback, agi::Context const *context = nullptr,
+	bool alpha = true, std::function<void()> onDismiss = {});
 
 /// Ask the user to pick an autosaved file to open
 /// @return Path to file or empty string if canceled

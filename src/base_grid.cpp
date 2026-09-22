@@ -148,6 +148,10 @@ void BaseGrid::OnSubtitlesCommit(int type) {
 	if (type & AssFile::COMMIT_DIAG_TIME)
 		Refresh(false);
 	else if (type & AssFile::COMMIT_DIAG_TEXT) {
+		if (context->foldController->GetMaxDepth() > 0) {
+			Refresh(false);
+			return;
+		}
 		for (auto const& rect : text_refresh_rects)
 			RefreshRect(rect, false);
 	}
@@ -187,31 +191,18 @@ void BaseGrid::UpdateStyle() {
 	// Set line height
 	lineHeight = dc.GetCharHeight() + 4;
 
-	// Set row brushes. Named dark themes use one central palette so the grid,
-	// edit area, audio view and future localization panels stay coherent.
-	if (theme::IsDark()) {
-		auto const& palette = theme::GetPalette();
-		row_colors.Default.SetColour(palette.grid_background);
-		row_colors.Header.SetColour(palette.grid_header);
-		row_colors.Selection.SetColour(palette.selection);
-		row_colors.Comment.SetColour(palette.grid_comment);
-		row_colors.Visible.SetColour(palette.grid_in_frame);
-		row_colors.SelectedComment.SetColour(palette.grid_selected_comment);
-		row_colors.FoldOpen.SetColour(palette.grid_fold_open);
-		row_colors.FoldClosed.SetColour(palette.grid_fold_closed);
-		row_colors.LeftCol.SetColour(palette.grid_left_column);
-	}
-	else {
-		row_colors.Default.SetColour(to_wx(OPT_GET("Colour/Subtitle Grid/Background/Background")->GetColor()));
-		row_colors.Header.SetColour(to_wx(OPT_GET("Colour/Subtitle Grid/Header")->GetColor()));
-		row_colors.Selection.SetColour(to_wx(OPT_GET("Colour/Subtitle Grid/Background/Selection")->GetColor()));
-		row_colors.Comment.SetColour(to_wx(OPT_GET("Colour/Subtitle Grid/Background/Comment")->GetColor()));
-		row_colors.Visible.SetColour(to_wx(OPT_GET("Colour/Subtitle Grid/Background/Inframe")->GetColor()));
-		row_colors.SelectedComment.SetColour(to_wx(OPT_GET("Colour/Subtitle Grid/Background/Selected Comment")->GetColor()));
-		row_colors.FoldOpen.SetColour(to_wx(OPT_GET("Colour/Subtitle Grid/Background/Open Fold")->GetColor()));
-		row_colors.FoldClosed.SetColour(to_wx(OPT_GET("Colour/Subtitle Grid/Background/Closed Fold")->GetColor()));
-		row_colors.LeftCol.SetColour(to_wx(OPT_GET("Colour/Subtitle Grid/Left Column")->GetColor()));
-	}
+	// All named themes own the grid palette, including Light. Old custom dark
+	// colours must not leak into a newly selected light theme.
+	auto const& palette = theme::GetPalette();
+	row_colors.Default.SetColour(palette.grid_background);
+	row_colors.Header.SetColour(palette.grid_header);
+	row_colors.Comment.SetColour(palette.grid_comment);
+	row_colors.Visible.SetColour(palette.grid_in_frame);
+	row_colors.FoldOpen.SetColour(palette.grid_fold_open);
+	row_colors.FoldClosed.SetColour(palette.grid_fold_closed);
+	row_colors.LeftCol.SetColour(palette.grid_left_column);
+	row_colors.Selection.SetColour(theme::GetPalette().selection);
+	row_colors.SelectedComment.SetColour(theme::GetPalette().grid_selected_comment);
 
 	if (width_helper)
 		width_helper->ClearCache();
@@ -224,13 +215,14 @@ void BaseGrid::UpdateStyle() {
 
 void BaseGrid::UpdateMaps() {
 	index_line_map.clear();
-	vis_index_line_map.clear();
+	display_rows = context->foldController->GetDisplayRows();
 
 	for (auto& curdiag : context->ass->Events)
 		index_line_map.push_back(&curdiag);
 
-	for (AssDialogue *curdiag = &*context->ass->Events.begin(); curdiag != nullptr; curdiag = curdiag->Fold.getNextVisible())
-		vis_index_line_map.push_back(&*curdiag);
+	active_view_row = -1;
+	if (auto active = context->selectionController->GetActiveLine())
+		extendRow = active->Fold.getVisibleRow();
 
 	SetColumnWidths();
 	AdjustScrollbar();
@@ -241,15 +233,19 @@ void BaseGrid::OnActiveLineChanged(AssDialogue *new_active) {
 	if (new_active) {
 		if (new_active->Row != active_row)
 			MakeRowVisible(new_active->Row);
-		extendRow = active_row = new_active->Row;
+		active_row = new_active->Row;
+		extendRow = active_view_row = new_active->Fold.getVisibleRow();
 		Refresh(false);
 	}
-	else
+	else {
 		active_row = -1;
+		active_view_row = -1;
+	}
 }
 
 void BaseGrid::MakeRowVisible(int row) {
-	MakeVisRowVisible(GetDialogue(row)->Fold.getVisibleRow());
+	if (auto line = GetDialogue(row))
+		MakeVisRowVisible(line->Fold.getVisibleRow());
 }
 
 void BaseGrid::MakeVisRowVisible(int row) {
@@ -262,12 +258,8 @@ void BaseGrid::MakeVisRowVisible(int row) {
 }
 
 void BaseGrid::SelectRow(int row, bool addToSelected, bool select) {
-	if (row < 0 || (size_t)row >= vis_index_line_map.size()) return;
-
-	AssDialogue *line = vis_index_line_map[row];
-	std::vector<AssDialogue *> lines{line};
-	if (line->Fold.hasFold() && !line->Fold.isEnd() && line->Fold.isFolded())
-		lines = context->foldController->GetFoldLines(*line);
+	auto lines = RowMembers(row);
+	if (lines.empty()) return;
 
 	if (!addToSelected) {
 		context->selectionController->SetSelectedSet(Selection(lines.begin(), lines.end()));
@@ -290,7 +282,8 @@ void BaseGrid::OnSeek() {
 
 	auto it = begin(visible_rows);
 	for (int i : boost::irange(yPos, yPos + lines)) {
-		if (IsDisplayed(vis_index_line_map[i])) {
+		auto members = RowMembers(i);
+		if (std::any_of(members.begin(), members.end(), [&](auto line) { return IsDisplayed(line); })) {
 			if (it == end(visible_rows) || *it != i) {
 				Refresh(false);
 				return;
@@ -340,12 +333,12 @@ void BaseGrid::OnPaint(wxPaintEvent &) {
 
 	// Row colors
 	auto const& palette = theme::GetPalette();
-	wxColour text_standard = theme::IsDark() ? palette.grid_text : to_wx(OPT_GET("Colour/Subtitle Grid/Standard")->GetColor());
-	wxColour text_selection = theme::IsDark() ? palette.grid_selected_text : to_wx(OPT_GET("Colour/Subtitle Grid/Selection")->GetColor());
-	wxColour text_collision = theme::IsDark() ? palette.grid_collision_text : to_wx(OPT_GET("Colour/Subtitle Grid/Collision")->GetColor());
+	wxColour text_standard = palette.grid_text;
+	wxColour text_selection = palette.grid_selected_text;
+	wxColour text_collision = palette.grid_collision_text;
 
 	// First grid row
-	wxPen grid_pen(theme::IsDark() ? palette.grid_lines : to_wx(OPT_GET("Colour/Subtitle Grid/Lines")->GetColor()));
+	wxPen grid_pen(palette.grid_lines);
 	dc.SetPen(grid_pen);
 	dc.DrawLine(0, 0, w, 0);
 	dc.SetPen(*wxTRANSPARENT_PEN);
@@ -388,9 +381,12 @@ void BaseGrid::OnPaint(wxPaintEvent &) {
 
 	for (int i : agi::util::range(nDraw)) {
 		wxBrush color = row_colors.Default;
-		AssDialogue *curDiag = vis_index_line_map[i + yPos];
+		int view_row = i + yPos;
+		AssDialogue *curDiag = GetVisDialogue(view_row);
+		bool group_header = IsGroupHeader(view_row);
+		auto members = RowMembers(view_row);
 
-		bool inSel = !!selection.count(curDiag);
+		bool inSel = std::all_of(members.begin(), members.end(), [&](auto line) { return selection.count(line); });
 		if (inSel && curDiag->Comment)
 			color = row_colors.SelectedComment;
 		else if (inSel)
@@ -398,13 +394,14 @@ void BaseGrid::OnPaint(wxPaintEvent &) {
 		else if (curDiag->Comment)
 			color = row_colors.Comment;
 
-		if (OPT_GET("Subtitle/Grid/Highlight Subtitles in Frame")->GetBool() && IsDisplayed(curDiag)) {
+		if (OPT_GET("Subtitle/Grid/Highlight Subtitles in Frame")->GetBool() &&
+			std::any_of(members.begin(), members.end(), [&](auto line) { return IsDisplayed(line); })) {
 			if (color == row_colors.Default)
 				color = row_colors.Visible;
 			visible_rows.push_back(i + yPos);
 		}
 
-		if (curDiag->Fold.hasFold() && !inSel) {
+		if (group_header && !inSel) {
 			color = curDiag->Fold.isFolded() ? row_colors.FoldClosed : row_colors.FoldOpen;
 		}
 
@@ -413,10 +410,10 @@ void BaseGrid::OnPaint(wxPaintEvent &) {
 		// Draw row background color
 		if (color != row_colors.Default) {
 			dc.SetPen(*wxTRANSPARENT_PEN);
-			dc.DrawRectangle(grid_x, (i + 1) * lineHeight + 1, w, lineHeight);
+			dc.DrawRectangle(group_header ? 0 : grid_x, (i + 1) * lineHeight + 1, w, lineHeight);
 		}
 
-		if (active_line != curDiag && curDiag->CollidesWith(active_line))
+		if (!group_header && active_line != curDiag && curDiag->CollidesWith(active_line))
 			dc.SetTextForeground(text_collision);
 		else if (inSel)
 			dc.SetTextForeground(text_selection);
@@ -426,10 +423,30 @@ void BaseGrid::OnPaint(wxPaintEvent &) {
 		// Draw text
 		int x = 0;
 		int y = (i + 1) * lineHeight;
-		for (size_t j : agi::util::range(columns.size())) {
-			if (paint_columns[j])
-				columns[j]->Paint(dc, x, y, curDiag, context);
-			x += columns[j]->Width();
+		if (group_header) {
+			// This row is drawn directly from group metadata, never from a fake
+			// AssDialogue with a combined duration or duplicate subtitle text.
+			int start = curDiag->Start, end = curDiag->End;
+			for (auto member : members) {
+				start = std::min(start, int(member->Start));
+				end = std::max(end, int(member->End));
+			}
+			auto label = wxString::Format(_("Logical group (%d subtitles)"), int(members.size()));
+			label += "  " + to_wx(agi::Time(start).GetAssFormatted()) + wxString::FromUTF8(" → ") + to_wx(agi::Time(end).GetAssFormatted());
+			label += "  " + to_wx(curDiag->GetStrippedText());
+			dc.SetClippingRegion(0, y + 1, w, lineHeight - 1);
+			dc.SetFont(font.Bold());
+			dc.DrawText(curDiag->Fold.isFolded() ? wxString::FromUTF8("▶") : wxString::FromUTF8("▼"), grid_x + 3, y + 2);
+			dc.DrawText(label, grid_x + 24, y + 2);
+			dc.SetFont(font);
+			dc.DestroyClippingRegion();
+		}
+		else {
+			for (size_t j : agi::util::range(columns.size())) {
+				if (paint_columns[j])
+					columns[j]->Paint(dc, x, y, curDiag, context);
+				x += columns[j]->Width();
+			}
 		}
 
 		// Draw grid
@@ -445,17 +462,22 @@ void BaseGrid::OnPaint(wxPaintEvent &) {
 		dc.SetPen(grid_pen);
 		for (auto const& column : columns) {
 			x += column->Width();
-			if (x < w)
-				dc.DrawLine(x, 0, x, maxH);
+			if (x < w) {
+				dc.DrawLine(x, 0, x, lineHeight);
+				for (int i = 0; i < nDraw; ++i)
+					if (!IsGroupHeader(i + yPos))
+						dc.DrawLine(x, (i + 1) * lineHeight, x, (i + 2) * lineHeight);
+			}
 		}
 		dc.DrawLine(0, 0, 0, maxH);
 		dc.DrawLine(w, 0, w, maxH);
 	}
 
-	if (active_line && active_line->Fold.getVisibleRow() >= yPos && active_line->Fold.getVisibleRow() < yPos + nDraw) {
-		dc.SetPen(wxPen(theme::IsDark() ? palette.grid_active_border : to_wx(OPT_GET("Colour/Subtitle Grid/Active Border")->GetColor())));
+	int active_view = ActiveViewRow();
+	if (active_line && active_view >= yPos && active_view < yPos + nDraw) {
+		dc.SetPen(wxPen(palette.grid_active_border));
 		dc.SetBrush(*wxTRANSPARENT_BRUSH);
-		dc.DrawRectangle(0, (active_line->Fold.getVisibleRow() - yPos + 1) * lineHeight, w, lineHeight + 1);
+		dc.DrawRectangle(0, (active_view - yPos + 1) * lineHeight, w, lineHeight + 1);
 	}
 }
 
@@ -501,6 +523,24 @@ void BaseGrid::OnMouseEvent(wxMouseEvent &event) {
 	if (event.ButtonDown() && OPT_GET("Subtitle/Grid/Focus Allow")->GetBool())
 		SetFocus();
 
+	// Only the synthetic header owns the expand/collapse affordance. The
+	// first real subtitle beneath it remains an ordinary selectable child.
+	if (dlg && IsGroupHeader(row) && !shift && !ctrl && !alt &&
+		((click && event.GetX() < columns[0]->Width() + 24) || dclick)) {
+		context->foldController->ToggleFoldsAt({dlg});
+		active_view_row = row;
+		return;
+	}
+	if (dlg && event.RightDown()) {
+		auto members = RowMembers(row);
+		auto const& selected = context->selectionController->GetSelectedSet();
+		if (!std::all_of(members.begin(), members.end(), [&](auto line) { return selected.count(line); })) {
+			context->selectionController->SetActiveLine(dlg);
+			SelectRow(row);
+		}
+		active_view_row = row;
+	}
+
 	if (holding) {
 		if (!event.LeftIsDown()) {
 			if (dlg)
@@ -511,13 +551,13 @@ void BaseGrid::OnMouseEvent(wxMouseEvent &event) {
 		else {
 			// Only scroll if the mouse has moved to a different row to avoid
 			// scrolling on sloppy clicks
-			if (VisRowToRow(row) != extendRow) {
+			if (row != extendRow) {
 				if (row <= yPos)
 					ScrollTo(yPos - 3);
 				// When dragging down we give a 3 row margin to make it easier
 				// to see what's going on, but we don't want to scroll down if
 				// the user clicks on the bottom row and drags up
-				else if (row > yPos + h / lineHeight - (VisRowToRow(row) > extendRow ? 3 : 1))
+				else if (row > yPos + h / lineHeight - (row > extendRow ? 3 : 1))
 					ScrollTo(yPos + 3);
 			}
 		}
@@ -527,7 +567,7 @@ void BaseGrid::OnMouseEvent(wxMouseEvent &event) {
 		CaptureMouse();
 	}
 
-	if (dlg && columns[col]->OnMouseEvent(dlg, context, event)) {
+	if (dlg && !IsGroupHeader(row) && col < columns.size() && columns[col]->OnMouseEvent(dlg, context, event)) {
 		return;
 	}
 
@@ -540,14 +580,15 @@ void BaseGrid::OnMouseEvent(wxMouseEvent &event) {
 		int old_y_pos = yPos;
 		context->selectionController->SetActiveLine(dlg);
 		ScrollTo(old_y_pos);
-		extendRow = VisRowToRow(row);
+		extendRow = active_view_row = row;
 
 		auto const& selection = context->selectionController->GetSelectedSet();
 
 		// Toggle selected
 		if (click && ctrl && !shift && !alt) {
-			bool isSel = !!selection.count(dlg);
-			if (isSel && selection.size() == 1) return;
+			auto members = RowMembers(row);
+			bool isSel = std::all_of(members.begin(), members.end(), [&](auto line) { return selection.count(line); });
+			if (isSel && selection.size() == members.size()) return;
 			SelectRow(row, true, !isSel);
 			return;
 		}
@@ -569,18 +610,7 @@ void BaseGrid::OnMouseEvent(wxMouseEvent &event) {
 		// Block select
 		if ((click && shift && !alt) || holding) {
 			extendRow = old_extend;
-			int i1 = VisRowToRow(row);
-			int i2 = extendRow;
-
-			if (i1 > i2)
-				std::swap(i1, i2);
-
-			// Toggle each
-			Selection newsel;
-			if (ctrl) newsel = selection;
-			for (int i = i1; i <= i2; i++)
-				newsel.insert(GetDialogue(i));
-			context->selectionController->SetSelectedSet(std::move(newsel));
+			SelectRange(row, extendRow, ctrl);
 			return;
 		}
 
@@ -682,13 +712,37 @@ AssDialogue *BaseGrid::GetDialogue(int n) const {
 }
 
 AssDialogue *BaseGrid::GetVisDialogue(int n) const {
-	if (static_cast<size_t>(n) >= vis_index_line_map.size()) return nullptr;
-	return vis_index_line_map[n];
+	if (static_cast<size_t>(n) >= display_rows.size()) return nullptr;
+	return display_rows[n].line;
 }
 
-int BaseGrid::VisRowToRow(int n) const {
-	AssDialogue *d = GetVisDialogue(n);
-	return d != nullptr ? d->Row : GetRows() - 1;
+bool BaseGrid::IsGroupHeader(int n) const {
+	return static_cast<size_t>(n) < display_rows.size() && display_rows[n].group_header;
+}
+
+std::vector<AssDialogue *> BaseGrid::RowMembers(int n) const {
+	auto line = GetVisDialogue(n);
+	if (!line) return {};
+	if (IsGroupHeader(n)) return context->foldController->GetFoldLines(*line);
+	return {line};
+}
+
+void BaseGrid::SelectRange(int from, int to, bool addToSelected) {
+	if (to < from) std::swap(from, to);
+	Selection selected;
+	if (addToSelected) selected = context->selectionController->GetSelectedSet();
+	for (int i = std::max(0, from); i <= to && i < GetVisRows(); ++i) {
+		auto members = RowMembers(i);
+		selected.insert(members.begin(), members.end());
+	}
+	context->selectionController->SetSelectedSet(std::move(selected));
+}
+
+int BaseGrid::ActiveViewRow() const {
+	auto active = context->selectionController->GetActiveLine();
+	if (!active) return -1;
+	if (GetVisDialogue(active_view_row) == active) return active_view_row;
+	return active->Fold.getVisibleRow();
 }
 
 bool BaseGrid::IsDisplayed(const AssDialogue *line) const {
@@ -750,14 +804,16 @@ void BaseGrid::OnKeyDown(wxKeyEvent &event) {
 		return;
 	}
 
-	auto active_line = context->selectionController->GetActiveLine();
 	int old_extend = extendRow;
-	int next = mid(0, (active_line ? active_line->Fold.getVisibleRow() : 0) + dir * step, GetVisRows() - 1);
+	int next = mid(0, std::max(0, ActiveViewRow()) + dir * step, GetVisRows() - 1);
 	context->selectionController->SetActiveLine(GetVisDialogue(next));
+	active_view_row = next;
 
 	// Move selection
 	if (!ctrl && !shift && !alt) {
+		extendRow = next;
 		SelectRow(next);
+		MakeVisRowVisible(next);
 		return;
 	}
 
@@ -768,18 +824,7 @@ void BaseGrid::OnKeyDown(wxKeyEvent &event) {
 	// Shift-selection
 	if (shift && !ctrl && !alt) {
 		extendRow = old_extend;
-		// Set range
-		int begin = VisRowToRow(next);
-		int end = extendRow;
-		if (end < begin)
-			std::swap(begin, end);
-
-		// Select range
-		Selection newsel;
-		for (int i = begin; i <= end; i++)
-			newsel.insert(GetDialogue(i));
-
-		context->selectionController->SetSelectedSet(std::move(newsel));
+		SelectRange(next, extendRow, false);
 
 		MakeVisRowVisible(next);
 		return;

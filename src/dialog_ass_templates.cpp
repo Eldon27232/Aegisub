@@ -10,6 +10,8 @@
 #include "ass_file.h"
 #include "ass_template_store.h"
 #include "compat.h"
+#include "colour_button.h"
+#include "colour_picker_model.h"
 #include "include/aegisub/context.h"
 #include "options.h"
 #include "selection_controller.h"
@@ -84,7 +86,7 @@ class TemplateParametersDialog final : public wxDialog {
 	std::vector<wxTextCtrl *> values;
 
 public:
-	TemplateParametersDialog(wxWindow *parent, std::string_view source)
+	TemplateParametersDialog(wxWindow *parent, std::string_view source, agi::Context *context)
 	: wxDialog(parent, wxID_ANY, _("Edit parameters before applying template"), wxDefaultPosition, wxDefaultSize,
 		wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER)
 	, parameters(ass::templates::ExtractParameters(source))
@@ -102,7 +104,19 @@ public:
 			grid->Add(new wxStaticText(scroll, wxID_ANY, to_wx(parameter.label)), wxSizerFlags().CenterVertical());
 			auto *value = new wxTextCtrl(scroll, wxID_ANY, to_wx(parameter.value));
 			values.push_back(value);
-			grid->Add(value, wxSizerFlags(1).Expand());
+			bool color_parameter = false;
+			for (auto tag : {"c", "1c", "2c", "3c", "4c"})
+				color_parameter |= parameter.id.rfind(std::string("tag:\\") + tag + ":", 0) == 0;
+			auto parsed_color = color_parameter ? colour_picker::ParseHex(parameter.value) : std::nullopt;
+			if (parsed_color) {
+				value->Hide();
+				auto color = new ColourButton(scroll, FromDIP(wxSize(80, 18)), false, *parsed_color, wxDefaultValidator, context);
+				color->Bind(EVT_COLOR, [value](ValueEvent<agi::Color>& event) {
+					value->ChangeValue(to_wx(event.Get().GetAssOverrideFormatted()));
+				});
+				grid->Add(color, wxSizerFlags().Left());
+			}
+			else grid->Add(value, wxSizerFlags(1).Expand());
 		}
 		scroll->SetSizer(grid);
 		sizer->Add(scroll, wxSizerFlags(1).Expand().Border(wxLEFT | wxRIGHT));
@@ -225,7 +239,7 @@ class TemplateManagerDialog final : public wxDialog {
 	std::optional<std::string> PreparedText(Entry const& entry) {
 		auto parameters = ass::templates::ExtractParameters(entry.text);
 		if (parameters.empty()) return entry.text;
-		TemplateParametersDialog dialog(this, entry.text);
+		TemplateParametersDialog dialog(this, entry.text, context);
 		if (dialog.ShowModal() != wxID_OK) return std::nullopt;
 		return ass::templates::ApplyParameters(entry.text, dialog.Values());
 	}

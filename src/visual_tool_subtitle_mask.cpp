@@ -13,6 +13,7 @@
 #include "include/aegisub/context.h"
 #include "libresrc/libresrc.h"
 #include "options.h"
+#include "theme.h"
 #include "selection_controller.h"
 #include "video_controller.h"
 #include "video_display.h"
@@ -22,6 +23,11 @@
 
 #include <wx/button.h>
 #include <wx/toolbar.h>
+#include <wx/minifram.h>
+#include <wx/display.h>
+#include <wx/choice.h>
+#include <wx/sizer.h>
+#include <wx/stattext.h>
 
 namespace {
 enum {
@@ -36,51 +42,78 @@ VisualToolSubtitleMask::VisualToolSubtitleMask(VideoDisplay *parent, agi::Contex
 	DoRefresh();
 }
 
+VisualToolSubtitleMask::~VisualToolSubtitleMask() {
+	panel_lifetime.reset();
+	if (panel) panel->Destroy();
+	if (parent->HasCapture()) parent->ReleaseMouse();
+}
+
 void VisualToolSubtitleMask::SetToolbar(wxToolBar *new_toolbar) {
 	toolbar = new_toolbar;
-	int icon_size = OPT_GET("App/Toolbar Icon Size")->GetInt();
-	toolbar->AddSeparator();
-	toolbar->AddTool(TOOL_RECTANGLE, _("Rectangle subtitle mask"), GETBUNDLE(visual_clip, icon_size),
-		_("Drag a rectangle to hide only this area of the selected subtitle"), wxITEM_CHECK);
-	toolbar->AddTool(TOOL_POLYGON, _("Path subtitle mask"), GETBUNDLE(visual_vector_clip, icon_size),
-		_("Click to add points, double-click to finish, or right-click to cancel drawing"), wxITEM_CHECK);
-
-	auto add_button = [&](wxString const& label, wxString const& tip, auto action) {
-		auto *button = new wxButton(toolbar, wxID_ANY, label);
-		button->SetToolTip(tip);
-		button->Bind(wxEVT_BUTTON, action);
-		toolbar->AddControl(button);
+	panel = new wxMiniFrame(wxGetTopLevelParent(parent), wxID_ANY, _("Subtitle occlusion"), wxDefaultPosition,
+		wxDefaultSize, wxCAPTION | wxCLOSE_BOX | wxFRAME_TOOL_WINDOW | wxFRAME_FLOAT_ON_PARENT);
+	panel->SetName("SubtitleMaskPanel");
+	auto life = std::weak_ptr<int>(panel_lifetime);
+	auto outer = new wxBoxSizer(wxVERTICAL);
+	outer->Add(new wxStaticText(panel, wxID_ANY, _("Hide an area of the selected subtitle, not the video.")), 0, wxALL, 10);
+	shape_choice = new wxChoice(panel, wxID_ANY);
+	for (auto const& name : {_("Select / adjust"), _("Rectangle"), _("Polygon / path")}) shape_choice->Append(name);
+	shape_choice->SetSelection(points.empty() ? 1 : 0);
+	shape_mode = points.empty() ? ShapeMode::Rectangle : ShapeMode::Select;
+	outer->Add(shape_choice, 0, wxLEFT | wxRIGHT | wxEXPAND, 10);
+	shape_choice->Bind(wxEVT_CHOICE, [this, life](wxCommandEvent&) {
+		if (life.expired()) return;
+		int index = shape_choice->GetSelection();
+		SetSubTool(index == 0 ? 2 : index - 1);
+	});
+	auto buttons = new wxGridSizer(2, 5, 5);
+	auto button = [&](wxString const& label, auto action) {
+		auto control = new wxButton(panel, wxID_ANY, label);
+		control->Bind(wxEVT_BUTTON, [life, action](wxCommandEvent&) { if (!life.expired()) action(); });
+		buttons->Add(control, 0, wxEXPAND);
 	};
-	add_button(_("Shrink"), _("Shrink by 10% around the mask center"), [this](wxCommandEvent&) {
-		TransformMask(0.9, 0.0, _("Shrink subtitle mask"));
-	});
-	add_button(_("Enlarge"), _("Enlarge by 10% around the mask center"), [this](wxCommandEvent&) {
-		TransformMask(1.1, 0.0, _("Enlarge subtitle mask"));
-	});
-	add_button(_("Rotate left"), _("Rotate the mask 5 degrees counterclockwise"), [this](wxCommandEvent&) {
-		TransformMask(1.0, -5.0, _("Rotate subtitle mask"));
-	});
-	add_button(_("Rotate right"), _("Rotate the mask 5 degrees clockwise"), [this](wxCommandEvent&) {
-		TransformMask(1.0, 5.0, _("Rotate subtitle mask"));
-	});
-	add_button(_("Cancel mask"), _("Cancel this subtitle mask from the current frame"), [this](wxCommandEvent&) {
-		CancelMask();
-	});
+	button(_("Close polygon"), [this] { FinishPolygon(); });
+	button(_("Cancel mask"), [this] { CancelMask(); });
+	button(_("Shrink"), [this] { TransformMask(0.9, 0.0, _("Shrink subtitle mask")); });
+	button(_("Enlarge"), [this] { TransformMask(1.1, 0.0, _("Enlarge subtitle mask")); });
+	button(_("Rotate left"), [this] { TransformMask(1.0, -5.0, _("Rotate subtitle mask")); });
+	button(_("Rotate right"), [this] { TransformMask(1.0, 5.0, _("Rotate subtitle mask")); });
+	outer->Add(buttons, 0, wxALL | wxEXPAND, 10);
+	frame_label = new wxStaticText(panel, wxID_ANY, "");
+	outer->Add(frame_label, 0, wxLEFT | wxRIGHT | wxBOTTOM, 10);
+	outer->Add(new wxStaticText(panel, wxID_ANY,
+		_("Changes replace the mask from this frame onward.\nDrag the shape or its points to adjust it.")), 0, wxLEFT | wxRIGHT | wxBOTTOM, 10);
+	OnFrameChanged();
+	panel->SetSizerAndFit(outer);
+	panel->Bind(wxEVT_CLOSE_WINDOW, [this, life](wxCloseEvent&) { if (!life.expired()) panel->Hide(); });
+	theme::Apply(panel);
+	auto anchor = parent->ClientToScreen(wxPoint(parent->GetClientSize().x, 0));
+	int display = wxDisplay::GetFromWindow(parent);
+	if (display != wxNOT_FOUND) {
+		auto area = wxDisplay(display).GetClientArea();
+		anchor.x = std::clamp(anchor.x, area.x, std::max(area.x, area.GetRight() - panel->GetSize().x));
+		anchor.y = std::clamp(anchor.y, area.y, std::max(area.y, area.GetBottom() - panel->GetSize().y));
+	}
+	panel->Move(anchor);
+	panel->Show();
+}
 
-	toolbar->Bind(wxEVT_TOOL, &VisualToolSubtitleMask::OnTool, this, TOOL_RECTANGLE, TOOL_POLYGON);
-	SetSubTool(static_cast<int>(shape_mode));
-	toolbar->Realize();
-	toolbar->Show(true);
+void VisualToolSubtitleMask::OnFrameChanged() {
+	if (frame_label) frame_label->SetLabel(wxString::Format(_("Current frame: %d - until subtitle end"), frame_number));
+}
+
+void VisualToolSubtitleMask::FinishPolygon() {
+	if (pending_points.size() < 3) return;
+	ApplyMask(pending_points, false, _("Create subtitle mask"));
+	SetSubTool(2);
+	parent->Render();
 }
 
 void VisualToolSubtitleMask::SetSubTool(int subtool) {
-	shape_mode = subtool == 1 ? ShapeMode::Polygon : ShapeMode::Rectangle;
+	shape_mode = subtool == 2 ? ShapeMode::Select : subtool == 1 ? ShapeMode::Polygon : ShapeMode::Rectangle;
 	pending_points.clear();
 	rectangle_drawing = false;
-	if (toolbar) {
-		toolbar->ToggleTool(TOOL_RECTANGLE, shape_mode == ShapeMode::Rectangle);
-		toolbar->ToggleTool(TOOL_POLYGON, shape_mode == ShapeMode::Polygon);
-	}
+	if (shape_choice) shape_choice->SetSelection(shape_mode == ShapeMode::Select ? 0 : static_cast<int>(shape_mode) + 1);
 	parent->Render();
 }
 
@@ -226,21 +259,24 @@ void VisualToolSubtitleMask::OnMouseEvent(wxMouseEvent& event) {
 		if (pending_points.empty() || std::abs(pending_points.back().x - point.x) > 0.5 ||
 			std::abs(pending_points.back().y - point.y) > 0.5)
 			pending_points.push_back(point);
-		if (pending_points.size() >= 3)
-			ApplyMask(pending_points, false, _("Create subtitle mask"));
+		FinishPolygon();
 		pending_points.clear();
 		parent->Render();
 		return;
 	}
 
 	if (event.LeftDown()) {
+		if (shape_mode == ShapeMode::Polygon && pending_points.size() >= 3 &&
+			(DisplayPoint(pending_points.front()) - mouse_pos).SquareLen() <= 100.0f) {
+			FinishPolygon(); return;
+		}
 		press_position = mouse_pos;
-		dragged_point = pending_points.empty() ? HitPoint(mouse_pos) : -1;
+		dragged_point = shape_mode == ShapeMode::Select ? HitPoint(mouse_pos) : -1;
 		if (dragged_point >= 0) {
 			drag_original = points;
 			parent->CaptureMouse();
 		}
-		else if (pending_points.empty() && !points.empty() && ContainsPoint(ScriptPoint(mouse_pos))) {
+		else if (shape_mode == ShapeMode::Select && !points.empty() && ContainsPoint(ScriptPoint(mouse_pos))) {
 			moving_shape = true;
 			drag_original = points;
 			parent->CaptureMouse();
@@ -249,7 +285,7 @@ void VisualToolSubtitleMask::OnMouseEvent(wxMouseEvent& event) {
 			rectangle_drawing = true;
 			parent->CaptureMouse();
 		}
-		else {
+		else if (shape_mode == ShapeMode::Polygon) {
 			pending_points.push_back(ScriptPoint(mouse_pos));
 		}
 		parent->Render();
@@ -280,9 +316,11 @@ void VisualToolSubtitleMask::OnMouseEvent(wxMouseEvent& event) {
 		if (rectangle_drawing) {
 			auto a = ScriptPoint(press_position);
 			auto b = ScriptPoint(mouse_pos);
-			if (std::abs(a.x - b.x) >= 2.0 && std::abs(a.y - b.y) >= 2.0)
+			if (std::abs(a.x - b.x) >= 2.0 && std::abs(a.y - b.y) >= 2.0) {
 				ApplyMask({{a.x, a.y}, {b.x, a.y}, {b.x, b.y}, {a.x, b.y}}, true,
 					_("Create subtitle mask"));
+				SetSubTool(2);
+			}
 		}
 		rectangle_drawing = false;
 		moving_shape = false;

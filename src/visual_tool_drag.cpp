@@ -54,6 +54,11 @@ VisualToolDrag::VisualToolDrag(VideoDisplay *parent, agi::Context *context)
 : VisualTool<VisualToolDragDraggableFeature>(parent, context)
 {
 	segment_by_frame = OPT_GET("Tool/Visual/Frame Segments")->GetBool();
+	connections.push_back(OPT_SUB("Tool/Visual/Frame Segments", [this](agi::OptionValue const& value) {
+		segment_by_frame = value.GetBool();
+		if (toolbar && segment_button_id != -1)
+			toolbar->ToggleTool(segment_button_id, segment_by_frame);
+	}));
 	connections.push_back(c->selectionController->AddSelectionListener(&VisualToolDrag::OnSelectedSetChanged, this));
 	auto const& sel_set = c->selectionController->GetSelectedSet();
 	selection.insert(begin(selection), begin(sel_set), end(sel_set));

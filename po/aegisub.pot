@@ -7775,3 +7775,355 @@ msgstr ""
 #: ../src/ass_block_editor_model.cpp
 msgid "Z rotation"
 msgstr ""
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+#, c-format
+msgid "Logical group (%d subtitles)"
+msgstr ""
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "Color - changes apply immediately"
+msgstr ""
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "Hue (degrees)"
+msgstr ""
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "Saturation (%)"
+msgstr ""
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "Brightness (%)"
+msgstr ""
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "Opacity (%)"
+msgstr ""
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "RGB Hex"
+msgstr ""
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "ASS BGR Hex"
+msgstr ""
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "Eyedropper"
+msgstr ""
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "Click or drag to pick a color from the screen"
+msgstr ""
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "Recent colors"
+msgstr ""
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "Project colors"
+msgstr ""
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "Pick from current video frame"
+msgstr ""
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "add fold"
+msgstr ""
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "clear all folds"
+msgstr ""
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "open all folds"
+msgstr ""
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "close all folds"
+msgstr ""
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "clear folds"
+msgstr ""
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "open folds"
+msgstr ""
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "close folds"
+msgstr ""
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "toggle folds"
+msgstr ""
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid " >"
+msgstr ""
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "Folds"
+msgstr ""
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "Top left"
+msgstr ""
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "Top"
+msgstr ""
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "Top right"
+msgstr ""
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "Center"
+msgstr ""
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "Bottom left"
+msgstr ""
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "Bottom"
+msgstr ""
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "Bottom right"
+msgstr ""
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "Enabled"
+msgstr ""
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "Balanced, wider first line"
+msgstr ""
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "Wrap at line end"
+msgstr ""
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "No automatic wrapping"
+msgstr ""
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "Balanced, wider last line"
+msgstr ""
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "From X"
+msgstr ""
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "From Y"
+msgstr ""
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "To X"
+msgstr ""
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "To Y"
+msgstr ""
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "Start (ms)"
+msgstr ""
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "End (ms)"
+msgstr ""
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "Acceleration"
+msgstr ""
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "Fade out (ms)"
+msgstr ""
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "Fade in (ms)"
+msgstr ""
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "Start opacity (%)"
+msgstr ""
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "Hold opacity (%)"
+msgstr ""
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "End opacity (%)"
+msgstr ""
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "Fade in start (ms)"
+msgstr ""
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "Fade in end (ms)"
+msgstr ""
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "Fade out start (ms)"
+msgstr ""
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "Fade out end (ms)"
+msgstr ""
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "Degrees"
+msgstr ""
+
+
+#: src/subs_edit_box.cpp src/dialog_colorpicker.cpp src/base_grid.cpp
+msgid "Centiseconds"
+msgstr ""
+
+
+#: src/visual_tool_screen_mask.cpp src/visual_tool_subtitle_mask.cpp src/video_box.cpp
+msgid "Screen mask"
+msgstr ""
+
+
+#: src/visual_tool_screen_mask.cpp src/visual_tool_subtitle_mask.cpp src/video_box.cpp
+msgid "Select / adjust"
+msgstr ""
+
+
+#: src/visual_tool_screen_mask.cpp src/visual_tool_subtitle_mask.cpp src/video_box.cpp
+msgid "Rectangle"
+msgstr ""
+
+
+#: src/visual_tool_screen_mask.cpp src/visual_tool_subtitle_mask.cpp src/video_box.cpp
+msgid "Polygon / path"
+msgstr ""
+
+
+#: src/visual_tool_screen_mask.cpp src/visual_tool_subtitle_mask.cpp src/video_box.cpp
+msgid "Tool"
+msgstr ""
+
+
+#: src/visual_tool_screen_mask.cpp src/visual_tool_subtitle_mask.cpp src/video_box.cpp
+msgid "Close polygon"
+msgstr ""
+
+
+#: src/visual_tool_screen_mask.cpp src/visual_tool_subtitle_mask.cpp src/video_box.cpp
+msgid "Fill color"
+msgstr ""
+
+
+#: src/visual_tool_screen_mask.cpp src/visual_tool_subtitle_mask.cpp src/video_box.cpp
+msgid "N frames"
+msgstr ""
+
+
+#: src/visual_tool_screen_mask.cpp src/visual_tool_subtitle_mask.cpp src/video_box.cpp
+msgid "Until time"
+msgstr ""
+
+
+#: src/visual_tool_screen_mask.cpp src/visual_tool_subtitle_mask.cpp src/video_box.cpp
+msgid "Until subtitle end"
+msgstr ""
+
+
+#: src/visual_tool_screen_mask.cpp src/visual_tool_subtitle_mask.cpp src/video_box.cpp
+msgid "Custom frame range"
+msgstr ""
+
+
+#: src/visual_tool_screen_mask.cpp src/visual_tool_subtitle_mask.cpp src/video_box.cpp
+msgid "Drag a rectangle; click points then the first point to close a path."
+msgstr ""
+
+
+#: src/visual_tool_screen_mask.cpp src/visual_tool_subtitle_mask.cpp src/video_box.cpp
+msgid "Subtitle occlusion"
+msgstr ""
+
+
+#: src/visual_tool_screen_mask.cpp src/visual_tool_subtitle_mask.cpp src/video_box.cpp
+msgid "Hide an area of the selected subtitle, not the video."
+msgstr ""
+
+
+#: src/visual_tool_screen_mask.cpp src/visual_tool_subtitle_mask.cpp src/video_box.cpp
+msgid "Changes replace the mask from this frame onward.\nDrag the shape or its points to adjust it."
+msgstr ""
+
+
+#: src/visual_tool_screen_mask.cpp src/visual_tool_subtitle_mask.cpp src/video_box.cpp
+#, c-format
+msgid "Current frame: %d - until subtitle end"
+msgstr ""
+
+
+#: src/visual_tool_screen_mask.cpp
+msgid "Drag a rectangle.\nFor a path, click points, then click the first point."
+msgstr ""

@@ -8,8 +8,10 @@
 
 #include "ass_dialogue.h"
 #include "ass_file.h"
+#include "ass_override_ast.h"
 #include "async_video_provider.h"
 #include "colour_button.h"
+#include "colour_picker_model.h"
 #include "compat.h"
 #include "include/aegisub/context.h"
 #include "include/aegisub/video_provider.h"
@@ -26,10 +28,12 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 
 #include <wx/button.h>
 #include <wx/choice.h>
-#include <wx/dialog.h>
+#include <wx/minifram.h>
+#include <wx/display.h>
 #include <wx/sizer.h>
 #include <wx/spinctrl.h>
 #include <wx/stattext.h>
@@ -44,105 +48,7 @@ enum {
 
 using ass::screen_mask::DurationMode;
 
-class ScreenMaskSettingsDialog final : public wxDialog {
-	VisualToolScreenMask::Settings value;
-	agi::Context *context;
-	wxChoice *duration;
-	wxSpinCtrl *frame_count;
-	TimeEdit *until_time;
-	wxSpinCtrl *custom_start;
-	wxSpinCtrl *custom_end;
-	ColourButton *colour;
-	wxSpinCtrl *opacity;
-	wxSpinCtrl *layer;
 
-	void UpdateEnabled() {
-		auto selected = static_cast<DurationMode>(duration->GetSelection());
-		frame_count->Enable(selected == DurationMode::FrameCount);
-		until_time->Enable(selected == DurationMode::UntilFrame);
-		custom_start->Enable(selected == DurationMode::CustomRange);
-		custom_end->Enable(selected == DurationMode::CustomRange);
-	}
-
-public:
-	ScreenMaskSettingsDialog(wxWindow *parent, agi::Context *context,
-		VisualToolScreenMask::Settings const& initial, int maximum_frame)
-	: wxDialog(parent, wxID_ANY, _("Screen mask settings"), wxDefaultPosition, wxDefaultSize,
-		wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER)
-	, value(initial)
-	, context(context)
-	{
-		auto *sizer = new wxBoxSizer(wxVERTICAL);
-		auto *grid = new wxFlexGridSizer(2, FromDIP(8), FromDIP(10));
-		grid->AddGrowableCol(1, 1);
-
-		grid->Add(new wxStaticText(this, wxID_ANY, _("Duration")), wxSizerFlags().CenterVertical());
-		duration = new wxChoice(this, wxID_ANY);
-		duration->Append(_("Current frame only (default)"));
-		duration->Append(_("Multiple frames from the current frame"));
-		duration->Append(_("From the current frame to a specified time"));
-		duration->Append(_("From the current frame to the end of the current subtitle"));
-		duration->Append(_("Custom start and end frames"));
-		duration->SetSelection(static_cast<int>(value.duration));
-		grid->Add(duration, wxSizerFlags(1).Expand());
-
-		grid->Add(new wxStaticText(this, wxID_ANY, _("Number of frames")), wxSizerFlags().CenterVertical());
-		frame_count = new wxSpinCtrl(this, wxID_ANY, "", wxDefaultPosition, wxDefaultSize,
-			wxSP_ARROW_KEYS, 1, std::max(1, maximum_frame + 1), value.frame_count);
-		grid->Add(frame_count, wxSizerFlags(1).Expand());
-
-		grid->Add(new wxStaticText(this, wxID_ANY, _("Specified end time")), wxSizerFlags().CenterVertical());
-		until_time = new TimeEdit(this, wxID_ANY, context,
-			agi::Time(context->videoController->TimeAtFrame(value.until_frame, agi::vfr::END)).GetAssFormatted(),
-			wxDefaultSize, true);
-		grid->Add(until_time, wxSizerFlags(1).Expand());
-
-		grid->Add(new wxStaticText(this, wxID_ANY, _("Custom start frame")), wxSizerFlags().CenterVertical());
-		custom_start = new wxSpinCtrl(this, wxID_ANY, "", wxDefaultPosition, wxDefaultSize,
-			wxSP_ARROW_KEYS, 0, maximum_frame, value.custom_start_frame);
-		grid->Add(custom_start, wxSizerFlags(1).Expand());
-		grid->Add(new wxStaticText(this, wxID_ANY, _("Custom end frame")), wxSizerFlags().CenterVertical());
-		custom_end = new wxSpinCtrl(this, wxID_ANY, "", wxDefaultPosition, wxDefaultSize,
-			wxSP_ARROW_KEYS, 0, maximum_frame, value.custom_end_frame);
-		grid->Add(custom_end, wxSizerFlags(1).Expand());
-
-		grid->Add(new wxStaticText(this, wxID_ANY, _("Mask color")), wxSizerFlags().CenterVertical());
-		colour = new ColourButton(this, FromDIP(wxSize(80, 18)), false, value.colour, wxDefaultValidator, context);
-		grid->Add(colour, wxSizerFlags().Left());
-		grid->Add(new wxStaticText(this, wxID_ANY, _("Opacity (0-100%)")), wxSizerFlags().CenterVertical());
-		opacity = new wxSpinCtrl(this, wxID_ANY, "", wxDefaultPosition, wxDefaultSize,
-			wxSP_ARROW_KEYS, 0, 100, value.opacity);
-		grid->Add(opacity, wxSizerFlags(1).Expand());
-		grid->Add(new wxStaticText(this, wxID_ANY, _("Layer")), wxSizerFlags().CenterVertical());
-		layer = new wxSpinCtrl(this, wxID_ANY, "", wxDefaultPosition, wxDefaultSize,
-			wxSP_ARROW_KEYS, 0, 9999, value.layer);
-		grid->Add(layer, wxSizerFlags(1).Expand());
-
-		sizer->Add(new wxStaticText(this, wxID_ANY,
-			_("The color button uses the shared palette, eyedropper, recent colors, and frequently used project colors.")),
-			wxSizerFlags().Expand().Border(wxALL));
-		sizer->Add(grid, wxSizerFlags(1).Expand().Border(wxLEFT | wxRIGHT | wxBOTTOM));
-		sizer->Add(CreateSeparatedButtonSizer(wxOK | wxCANCEL), wxSizerFlags().Expand().Border(wxALL));
-		SetSizerAndFit(sizer);
-		SetMinSize(FromDIP(wxSize(520, -1)));
-		duration->Bind(wxEVT_CHOICE, [this](wxCommandEvent&) { UpdateEnabled(); });
-		UpdateEnabled();
-		theme::Apply(this);
-	}
-
-	VisualToolScreenMask::Settings Values() const {
-		auto result = value;
-		result.duration = static_cast<DurationMode>(duration->GetSelection());
-		result.frame_count = frame_count->GetValue();
-		result.until_frame = until_time->GetFrame();
-		result.custom_start_frame = custom_start->GetValue();
-		result.custom_end_frame = custom_end->GetValue();
-		result.colour = colour->GetColor();
-		result.opacity = opacity->GetValue();
-		result.layer = layer->GetValue();
-		return result;
-	}
-};
 }
 
 VisualToolScreenMask::VisualToolScreenMask(VideoDisplay *parent, agi::Context *context)
@@ -158,32 +64,22 @@ VisualToolScreenMask::VisualToolScreenMask(VideoDisplay *parent, agi::Context *c
 	DoRefresh();
 }
 
+VisualToolScreenMask::~VisualToolScreenMask() {
+	panel_lifetime.reset();
+	if (panel) panel->Destroy();
+	if (parent->HasCapture()) parent->ReleaseMouse();
+}
+
 void VisualToolScreenMask::SetToolbar(wxToolBar *new_toolbar) {
 	toolbar = new_toolbar;
-	int icon_size = OPT_GET("App/Toolbar Icon Size")->GetInt();
-	toolbar->AddSeparator();
-	toolbar->AddTool(TOOL_RECTANGLE, _("Rectangle mask"), GETBUNDLE(visual_clip, icon_size),
-		_("Drag to draw a rectangular screen mask"), wxITEM_CHECK);
-	toolbar->AddTool(TOOL_POLYGON, _("Polygon mask"), GETBUNDLE(visual_vector_clip, icon_size),
-		_("Click to add points, double-click to finish the polygon, or right-click to cancel"), wxITEM_CHECK);
-	auto *settings_button = new wxButton(toolbar, wxID_ANY, _("Color / Time / Layer"));
-	settings_button->SetToolTip(_("Set mask color, opacity, layer, and frame-based duration"));
-	toolbar->AddControl(settings_button);
-	toolbar->Bind(wxEVT_TOOL, &VisualToolScreenMask::OnTool, this, TOOL_RECTANGLE, TOOL_POLYGON);
-	settings_button->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { OpenSettings(); });
-	SetSubTool(static_cast<int>(shape_mode));
-	toolbar->Realize();
-	toolbar->Show(true);
+	OpenSettings();
 }
 
 void VisualToolScreenMask::SetSubTool(int subtool) {
-	shape_mode = subtool == 1 ? ShapeMode::Polygon : ShapeMode::Rectangle;
+	shape_mode = subtool == 2 ? ShapeMode::Select : subtool == 1 ? ShapeMode::Polygon : ShapeMode::Rectangle;
 	pending_points.clear();
 	rectangle_drawing = false;
-	if (toolbar) {
-		toolbar->ToggleTool(TOOL_RECTANGLE, shape_mode == ShapeMode::Rectangle);
-		toolbar->ToggleTool(TOOL_POLYGON, shape_mode == ShapeMode::Polygon);
-	}
+	if (shape_choice) shape_choice->SetSelection(shape_mode == ShapeMode::Select ? 0 : static_cast<int>(shape_mode) + 1);
 	parent->Render();
 }
 
@@ -196,16 +92,150 @@ void VisualToolScreenMask::OnTool(wxCommandEvent& event) {
 }
 
 void VisualToolScreenMask::OpenSettings() {
+	if (panel) { panel->Show(); panel->Raise(); return; }
 	auto provider = c->project->VideoProvider();
 	if (!provider) return;
-	ScreenMaskSettingsDialog dialog(toolbar, c, settings, provider->GetFrameCount() - 1);
-	if (dialog.ShowModal() != wxID_OK) return;
-	settings = dialog.Values();
+	int maximum = provider->GetFrameCount() - 1;
+	panel = new wxMiniFrame(wxGetTopLevelParent(parent), wxID_ANY, _("Screen mask"), wxDefaultPosition,
+		wxDefaultSize, wxCAPTION | wxCLOSE_BOX | wxFRAME_TOOL_WINDOW | wxFRAME_FLOAT_ON_PARENT);
+	panel->SetName("ScreenMaskPanel");
+	auto life = std::weak_ptr<int>(panel_lifetime);
+	auto outer = new wxBoxSizer(wxVERTICAL);
+	auto grid = new wxFlexGridSizer(2, 6, 8);
+	grid->AddGrowableCol(1);
+	auto row = [&](wxString const& label, wxWindow *control) {
+		grid->Add(new wxStaticText(panel, wxID_ANY, label), 0, wxALIGN_CENTER_VERTICAL);
+		grid->Add(control, 1, wxEXPAND);
+	};
+	shape_choice = new wxChoice(panel, wxID_ANY);
+	for (auto const& name : {_("Select / adjust"), _("Rectangle"), _("Polygon / path")}) shape_choice->Append(name);
+	shape_choice->SetSelection(points.empty() ? 1 : 0);
+	shape_mode = points.empty() ? ShapeMode::Rectangle : ShapeMode::Select;
+	row(_("Tool"), shape_choice);
+	shape_choice->Bind(wxEVT_CHOICE, [this, life](wxCommandEvent&) {
+		if (life.expired()) return;
+		int index = shape_choice->GetSelection();
+		SetSubTool(index == 0 ? 2 : index - 1);
+	});
+	auto finish = new wxButton(panel, wxID_ANY, _("Close polygon"));
+	row(_("Path"), finish);
+	finish->Bind(wxEVT_BUTTON, [this, life](wxCommandEvent&) { if (!life.expired()) FinishPolygon(); });
+	auto color = new ColourButton(panel, wxSize(90, 20), true, settings.colour, wxDefaultValidator, c);
+	row(_("Fill color"), color);
+	auto opacity = new wxSpinCtrl(panel, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 0, 100, settings.opacity);
+	row(_("Opacity (%)"), opacity);
+	auto duration = new wxChoice(panel, wxID_ANY);
+	for (auto const& name : {_("1 frame"), _("N frames"), _("Until time"), _("Until subtitle end"), _("Custom frame range")}) duration->Append(name);
+	duration->SetSelection(static_cast<int>(settings.duration));
+	row(_("Duration"), duration);
+	auto frames = new wxSpinCtrl(panel, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 1, maximum + 1, 1);
+	frames->SetName("ScreenMaskFrames");
+	row(_("Number of frames"), frames);
+	auto until = new TimeEdit(panel, wxID_ANY, c,
+		agi::Time(c->videoController->TimeAtFrame(settings.until_frame, agi::vfr::END)).GetAssFormatted(), wxDefaultSize, true);
+	row(_("Specified end time"), until);
+	auto start = new wxSpinCtrl(panel, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 0, maximum, settings.custom_start_frame);
+	auto end = new wxSpinCtrl(panel, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 0, maximum, settings.custom_end_frame);
+	row(_("Custom start frame"), start);
+	row(_("Custom end frame"), end);
+	auto layer = new wxSpinCtrl(panel, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 0, 9999, settings.layer);
+	row(_("Layer"), layer);
+	auto enabled = [duration, frames, until, start, end] {
+		auto mode = static_cast<DurationMode>(duration->GetSelection());
+		frames->Enable(mode == DurationMode::CurrentFrame || mode == DurationMode::FrameCount);
+		until->Enable(mode == DurationMode::UntilFrame);
+		start->Enable(mode == DurationMode::CustomRange);
+		end->Enable(mode == DurationMode::CustomRange);
+	};
+	auto apply = [this, life, duration, frames, until, start, end, color, opacity, layer](bool timing) {
+		if (life.expired()) return;
+		settings.duration = static_cast<DurationMode>(duration->GetSelection());
+		settings.frame_count = frames->GetValue();
+		settings.until_frame = until->GetFrame();
+		settings.custom_start_frame = start->GetValue();
+		settings.custom_end_frame = end->GetValue();
+		settings.colour = color->GetColor();
+		settings.opacity = opacity->GetValue();
+		settings.colour.a = colour_picker::OpacityToAssAlpha(settings.opacity);
+		color->SetColor(settings.colour);
+		settings.layer = layer->GetValue();
+		ApplySettings(timing);
+	};
+	color->Bind(EVT_COLOR, [opacity, apply](ValueEvent<agi::Color>& event) {
+		wxEventBlocker block(opacity);
+		opacity->SetValue(colour_picker::AssAlphaToOpacity(event.Get().a));
+		apply(false);
+	});
+	opacity->Bind(wxEVT_SPINCTRL, [apply](wxCommandEvent&) { apply(false); });
+	opacity->Bind(wxEVT_TEXT, [apply](wxCommandEvent&) { apply(false); });
+	layer->Bind(wxEVT_SPINCTRL, [apply](wxCommandEvent&) { apply(false); });
+	layer->Bind(wxEVT_TEXT, [apply](wxCommandEvent&) { apply(false); });
+	duration->Bind(wxEVT_CHOICE, [apply, enabled, frames, duration](wxCommandEvent&) {
+		if (duration->GetSelection() == 0) { wxEventBlocker block(frames); frames->SetValue(1); }
+		enabled(); apply(true);
+	});
+	auto frame_change = [apply, duration](wxCommandEvent&) { duration->SetSelection(1); apply(true); };
+	frames->Bind(wxEVT_SPINCTRL, frame_change);
+	frames->Bind(wxEVT_TEXT, frame_change);
+	until->Bind(wxEVT_TEXT, [apply](wxCommandEvent&) { apply(true); });
+	for (auto control : {start, end}) {
+		control->Bind(wxEVT_SPINCTRL, [apply](wxCommandEvent&) { apply(true); });
+		control->Bind(wxEVT_TEXT, [apply](wxCommandEvent&) { apply(true); });
+	}
+	sync_panel = [this, color, opacity, layer, duration, frames, until, start, end, enabled] {
+		auto set = [](wxSpinCtrl *control, int value) { wxEventBlocker block(control); control->SetValue(value); };
+		color->SetColor(settings.colour);
+		set(opacity, settings.opacity); set(layer, settings.layer);
+		set(frames, settings.frame_count); set(start, settings.custom_start_frame); set(end, settings.custom_end_frame);
+		duration->SetSelection(static_cast<int>(settings.duration));
+		enabled();
+	};
+	sync_panel();
+	outer->Add(grid, 1, wxALL | wxEXPAND, 10);
+	outer->Add(new wxStaticText(panel, wxID_ANY, _("Drag a rectangle.\nFor a path, click points, then click the first point.")), 0, wxALL, 10);
+	panel->SetSizerAndFit(outer);
+	panel->Bind(wxEVT_CLOSE_WINDOW, [this, life](wxCloseEvent&) { if (!life.expired()) panel->Hide(); });
+	enabled();
+	theme::Apply(panel);
+	auto anchor = parent->ClientToScreen(wxPoint(parent->GetClientSize().x, 0));
+	int display = wxDisplay::GetFromWindow(parent);
+	if (display != wxNOT_FOUND) {
+		auto area = wxDisplay(display).GetClientArea();
+		anchor.x = std::clamp(anchor.x, area.x, std::max(area.x, area.GetRight() - panel->GetSize().x));
+		anchor.y = std::clamp(anchor.y, area.y, std::max(area.y, area.GetBottom() - panel->GetSize().y));
+	}
+	panel->Move(anchor);
+	panel->Show();
+}
+
+void VisualToolScreenMask::ApplySettings(bool timing) {
 	if (active_line && active_line->Effect.get() == SCREEN_MASK_EFFECT) {
 		active_line->Text = ass::screen_mask::UpdateAppearance(active_line->Text.get(), settings.colour, settings.opacity);
 		active_line->Layer = settings.layer;
-		c->ass->Commit(_("Change screen mask appearance"), AssFile::COMMIT_DIAG_FULL, -1, active_line);
+		if (timing) {
+			ass::screen_mask::FrameRangeRequest request;
+			request.mode = settings.duration;
+			request.current_frame = c->videoController->FrameAtTime(active_line->Start, agi::vfr::START);
+			request.frame_count = settings.frame_count;
+			request.end_frame = settings.until_frame;
+			request.subtitle_end_frame = subtitle_end_frame;
+			request.custom_start_frame = settings.custom_start_frame;
+			request.custom_end_frame = settings.custom_end_frame;
+			request.maximum_frame = c->project->VideoProvider()->GetFrameCount() - 1;
+			auto range = ass::screen_mask::ResolveFrameRange(request);
+			active_line->Start = c->videoController->TimeAtFrame(range.start, agi::vfr::START);
+			active_line->End = c->videoController->TimeAtFrame(range.end, agi::vfr::END);
+		}
+		file_changed_connection.Block();
+		commit_id = c->ass->Commit(_("Change screen mask appearance"), AssFile::COMMIT_DIAG_FULL, commit_id, active_line);
+		file_changed_connection.Unblock();
 	}
+	parent->Render();
+}
+
+void VisualToolScreenMask::FinishPolygon() {
+	if (pending_points.size() >= 3) CreateMask(pending_points);
+	pending_points.clear();
 	parent->Render();
 }
 
@@ -270,6 +300,7 @@ void VisualToolScreenMask::CreateMask(std::vector<ass::screen_mask::Point> const
 	c->ass->Commit(_("Create screen mask"), AssFile::COMMIT_DIAG_ADDREM);
 	c->selectionController->SetSelectionAndActive({created}, created);
 	points = new_points;
+	SetSubTool(2);
 	parent->Render();
 }
 
@@ -283,6 +314,22 @@ void VisualToolScreenMask::DoRefresh() {
 	points.clear();
 	if (!active_line || active_line->Effect.get() != SCREEN_MASK_EFFECT) return;
 	points = ass::screen_mask::ParseGeometry(active_line->Text.get()).points;
+	auto document = ass::ast::Document::Parse(active_line->Text.get());
+	auto colors = document.FindTags("\\1c", false);
+	if (!colors.empty() && !colors.front()->Arguments().empty())
+		if (auto value = colour_picker::ParseHex(colors.front()->Arguments()[0])) settings.colour = *value;
+	auto alphas = document.FindTags("\\1a", false);
+	if (!alphas.empty() && !alphas.front()->Arguments().empty()) {
+		auto const& raw = alphas.front()->Arguments()[0];
+		if (raw.size() >= 3 && raw[0] == '&') settings.colour.a = std::strtoul(raw.c_str() + 2, nullptr, 16);
+	}
+	settings.opacity = colour_picker::AssAlphaToOpacity(settings.colour.a);
+	settings.layer = active_line->Layer;
+	settings.custom_start_frame = c->videoController->FrameAtTime(active_line->Start, agi::vfr::START);
+	settings.custom_end_frame = c->videoController->FrameAtTime(active_line->End, agi::vfr::END);
+	settings.frame_count = settings.custom_end_frame - settings.custom_start_frame + 1;
+	settings.duration = settings.frame_count == 1 ? DurationMode::CurrentFrame : DurationMode::FrameCount;
+	if (sync_panel) sync_panel();
 }
 
 void VisualToolScreenMask::OnMouseEvent(wxMouseEvent& event) {
@@ -310,13 +357,17 @@ void VisualToolScreenMask::OnMouseEvent(wxMouseEvent& event) {
 	}
 
 	if (event.LeftDown()) {
+		if (shape_mode == ShapeMode::Polygon && pending_points.size() >= 3 &&
+			(DisplayPoint(pending_points.front()) - mouse_pos).SquareLen() <= 100.0f) {
+			FinishPolygon(); return;
+		}
 		press_position = mouse_pos;
-		dragged_point = pending_points.empty() ? HitPoint(mouse_pos) : -1;
+		dragged_point = shape_mode == ShapeMode::Select ? HitPoint(mouse_pos) : -1;
 		if (dragged_point >= 0) {
 			drag_original = points;
 			parent->CaptureMouse();
 		}
-		else if (pending_points.empty() && !points.empty() && ContainsPoint(ScriptPoint(mouse_pos))) {
+		else if (shape_mode == ShapeMode::Select && !points.empty() && ContainsPoint(ScriptPoint(mouse_pos))) {
 			moving_shape = true;
 			drag_original = points;
 			parent->CaptureMouse();
@@ -325,7 +376,7 @@ void VisualToolScreenMask::OnMouseEvent(wxMouseEvent& event) {
 			rectangle_drawing = true;
 			parent->CaptureMouse();
 		}
-		else {
+		else if (shape_mode == ShapeMode::Polygon) {
 			pending_points.push_back(ScriptPoint(mouse_pos));
 		}
 		parent->Render();
@@ -375,7 +426,7 @@ void VisualToolScreenMask::OnMouseEvent(wxMouseEvent& event) {
 
 void VisualToolScreenMask::DrawPolygon(std::vector<ass::screen_mask::Point> const& polygon, bool close, bool controls) {
 	if (polygon.empty()) return;
-	auto line_colour = to_wx(settings.colour);
+	auto line_colour = theme::GetPalette().accent;
 	gl.SetLineColour(line_colour, 1.0f, 2);
 	for (size_t i = 1; i < polygon.size(); ++i)
 		gl.DrawLine(DisplayPoint(polygon[i - 1]), DisplayPoint(polygon[i]));
@@ -393,7 +444,7 @@ void VisualToolScreenMask::Draw() {
 	if (!pending_points.empty() && mouse_pos)
 		gl.DrawDashedLine(DisplayPoint(pending_points.back()), mouse_pos, 6);
 	if (rectangle_drawing) {
-		gl.SetLineColour(to_wx(settings.colour), 1.0f, 2);
+		gl.SetLineColour(theme::GetPalette().accent, 1.0f, 2);
 		gl.SetFillColour(to_wx(settings.colour), settings.opacity / 300.0f);
 		gl.DrawRectangle(press_position, mouse_pos);
 	}

@@ -12,6 +12,8 @@
 #include <string_view>
 #include <vector>
 
+#include <libaegisub/color.h>
+
 namespace ass::blocks {
 
 enum class ItemKind {
@@ -52,6 +54,11 @@ public:
 	bool Paste(std::optional<size_t> after, std::string_view source);
 	bool Replace(size_t item, std::string_view source);
 	bool Insert(std::optional<size_t> after, Feature const& feature);
+
+	/// Colour tags use the same picker at top level and inside transforms.
+	/// Each nested_path entry is an index in the current transform's Nodes().
+	agi::Color GetColour(size_t item, std::vector<size_t> nested_path = {}) const;
+	bool SetColour(size_t item, std::vector<size_t> nested_path, agi::Color colour);
 
 	static std::vector<Feature> const& Features();
 	static std::vector<Feature> SearchFeatures(std::string_view query);

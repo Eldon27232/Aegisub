@@ -29,6 +29,8 @@
 
 #include <libaegisub/signal.h>
 
+#include "fold_controller.h"
+
 #include <memory>
 #include <string>
 #include <vector>
@@ -61,6 +63,7 @@ class BaseGrid final : public wxWindow {
 	int yPos = 0;
 
 	int active_row = -1;
+	int active_view_row = -1;
 
 	std::unique_ptr<WidthHelper> width_helper;
 
@@ -88,7 +91,7 @@ class BaseGrid final : public wxWindow {
 	} row_colors;
 
 	std::vector<AssDialogue*> index_line_map;  ///< Row number -> dialogue line
-	std::vector<AssDialogue*> vis_index_line_map;  ///< Visible Row number -> dialogue line
+	std::vector<FoldDisplayRow> display_rows; ///< UI rows, including non-ASS group headers
 
 	/// Connection for video seek event. Stored explicitly so that it can be
 	/// blocked if the relevant option is disabled
@@ -122,7 +125,7 @@ class BaseGrid final : public wxWindow {
 	void SelectRow(int row, bool addToSelected = false, bool select=true);
 
 	int GetRows() const { return index_line_map.size(); }
-	int GetVisRows() const { return vis_index_line_map.size(); }
+	int GetVisRows() const { return display_rows.size(); }
 	void MakeRowVisible(int row);
 	void MakeVisRowVisible(int row);
 
@@ -136,7 +139,10 @@ class BaseGrid final : public wxWindow {
 	/// @return Visible ubtitle dialogue line for index, or 0 if invalid index
 	AssDialogue *GetVisDialogue(int n) const;
 
-	int VisRowToRow(int n) const;
+	bool IsGroupHeader(int n) const;
+	std::vector<AssDialogue *> RowMembers(int n) const;
+	void SelectRange(int from, int to, bool addToSelected);
+	int ActiveViewRow() const;
 
 public:
 	BaseGrid(wxWindow* parent, agi::Context *context);

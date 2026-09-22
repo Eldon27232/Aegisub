@@ -32,6 +32,7 @@
 #include "ass_dialogue.h"
 #include "ass_file.h"
 #include "compat.h"
+#include "command/command.h"
 #include "format.h"
 #include "include/aegisub/context.h"
 #include "include/aegisub/toolbar.h"
@@ -45,6 +46,7 @@
 
 #include <boost/range/algorithm/binary_search.hpp>
 #include <wx/combobox.h>
+#include <wx/button.h>
 #include <wx/sizer.h>
 #include <wx/statline.h>
 #include <wx/textctrl.h>
@@ -90,7 +92,22 @@ VideoBox::VideoBox(wxWindow *parent, bool isDetached, agi::Context *context)
 	videoBottomSizer->Add(VideoSubsPos, wxSizerFlags(1).Center().Border(wxLEFT));
 	videoBottomSizer->Add(zoomBox, wxSizerFlags(0).Center().Border(wxLEFT | wxRIGHT));
 
+	auto mask_tools = new wxBoxSizer(wxHORIZONTAL);
+	auto screen_mask = new wxButton(this, wxID_ANY, _("Screen mask"));
+	screen_mask->SetName("ScreenMaskTool");
+	screen_mask->Bind(wxEVT_BUTTON, [context](wxCommandEvent&) {
+		if (context->project->VideoProvider()) cmd::call("video/tool/screen_mask", context);
+	});
+	mask_tools->Add(screen_mask, 0, wxRIGHT, 5);
+	auto subtitle_mask = new wxButton(this, wxID_ANY, _("Subtitle occlusion"));
+	subtitle_mask->SetName("SubtitleMaskTool");
+	subtitle_mask->Bind(wxEVT_BUTTON, [context](wxCommandEvent&) {
+		if (context->project->VideoProvider() && context->selectionController->GetActiveLine())
+			cmd::call("video/tool/subtitle_mask", context);
+	});
+	mask_tools->Add(subtitle_mask);
 	auto VideoSizer = new wxBoxSizer(wxVERTICAL);
+	VideoSizer->Add(mask_tools, 0, wxALL, 4);
 	VideoSizer->Add(topSizer, 1, wxEXPAND, 0);
 	VideoSizer->Add(new wxStaticLine(this), 0, wxEXPAND, 0);
 	VideoSizer->Add(videoSlider, 0, wxEXPAND, 0);
