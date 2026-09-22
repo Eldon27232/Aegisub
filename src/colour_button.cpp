@@ -22,7 +22,8 @@
 
 AGI_DEFINE_EVENT(EVT_COLOR, agi::Color);
 
-ColourButton::ColourButton(wxWindow *parent, wxSize const& size, bool alpha, agi::Color col, wxValidator const& validator)
+ColourButton::ColourButton(wxWindow *parent, wxSize const& size, bool alpha, agi::Color col,
+	wxValidator const& validator, agi::Context const *context)
 : wxButton(parent, -1, "", wxDefaultPosition, wxSize(size.GetWidth() + 6, size.GetHeight() + 6), 0, validator)
 , bmp(size)
 , colour(std::move(col))
@@ -36,7 +37,7 @@ ColourButton::ColourButton(wxWindow *parent, wxSize const& size, bool alpha, agi
 			ValueEvent<agi::Color> evt(EVT_COLOR, GetId(), colour);
 			evt.SetEventObject(this);
 			AddPendingEvent(evt);
-		});
+		}, context);
 	});
 }
 

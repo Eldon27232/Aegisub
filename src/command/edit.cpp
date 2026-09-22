@@ -377,7 +377,7 @@ void show_color_picker(const agi::Context *c, agi::Color (AssStyle::*field), con
 		commit_id = c->ass->Commit(_("set color"), AssFile::COMMIT_DIAG_TEXT, commit_id, sel.size() == 1 ? *sel.begin() : nullptr);
 		if (active_shift)
 			c->textSelectionController->SetSelection(sel_start + active_shift, sel_start + active_shift);
-	});
+	}, c);
 
 	if (!ok && commit_id != -1) {
 		c->subsController->Undo();

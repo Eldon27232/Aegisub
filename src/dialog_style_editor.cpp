@@ -203,10 +203,10 @@ DialogStyleEditor::DialogStyleEditor(wxWindow *parent, AssStyle *style, agi::Con
 	BoxUnderline = new wxCheckBox(FontSizerBox, -1, _("&Underline"));
 	BoxStrikeout = new wxCheckBox(FontSizerBox, -1, _("&Strikeout"));
 	ColourButton *colorButton[] = {
-		new ColourButton(ColorsSizerBox, wxSize(55, 16), true, style->primary, ColorValidator(&work->primary)),
-		new ColourButton(ColorsSizerBox, wxSize(55, 16), true, style->secondary, ColorValidator(&work->secondary)),
-		new ColourButton(ColorsSizerBox, wxSize(55, 16), true, style->outline, ColorValidator(&work->outline)),
-		new ColourButton(ColorsSizerBox, wxSize(55, 16), true, style->shadow, ColorValidator(&work->shadow))
+		new ColourButton(ColorsSizerBox, wxSize(55, 16), true, style->primary, ColorValidator(&work->primary), c),
+		new ColourButton(ColorsSizerBox, wxSize(55, 16), true, style->secondary, ColorValidator(&work->secondary), c),
+		new ColourButton(ColorsSizerBox, wxSize(55, 16), true, style->outline, ColorValidator(&work->outline), c),
+		new ColourButton(ColorsSizerBox, wxSize(55, 16), true, style->shadow, ColorValidator(&work->shadow), c)
 	};
 	for (int i = 0; i < 3; i++)
 		margin[i] = new wxSpinCtrl(MarginSizerBox, -1, std::to_wstring(style->Margin[i]),
@@ -340,7 +340,8 @@ DialogStyleEditor::DialogStyleEditor(wxWindow *parent, AssStyle *style, agi::Con
 	MiscSizer->Add(MiscBoxBottom, wxSizerFlags().Expand().Border(wxTOP));
 
 	// Preview
-	auto previewButton = new ColourButton(PreviewSizerBox, wxSize(45, 16), false, OPT_GET("Colour/Style Editor/Background/Preview")->GetColor());
+	auto previewButton = new ColourButton(PreviewSizerBox, wxSize(45, 16), false,
+		OPT_GET("Colour/Style Editor/Background/Preview")->GetColor(), wxDefaultValidator, c);
 	PreviewText = new wxTextCtrl(PreviewSizerBox, -1, to_wx(OPT_GET("Tool/Style Editor/Preview Text")->GetString()));
 	SubsPreview = new SubtitlesPreview(PreviewSizerBox, wxSize(100, 60), (theme::IsDark() ? wxBORDER_SIMPLE : wxSUNKEN_BORDER), OPT_GET("Colour/Style Editor/Background/Preview")->GetColor());
 
