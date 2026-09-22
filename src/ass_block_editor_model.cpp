@@ -240,7 +240,9 @@ std::string Model::SerializePart(Part const& part) {
 void Model::SetSource(std::string source) {
 	original_ = std::move(source);
 	parts_ = ParseParts(original_);
-	if (parts_.empty()) {
+	if (std::none_of(parts_.begin(), parts_.end(), [](Part const& part) {
+		return part.kind == PartKind::Text;
+	})) {
 		Part part;
 		part.kind = PartKind::Text;
 		part.origin = Origin::Manual;
@@ -541,6 +543,30 @@ bool Model::ReplaceManual(size_t item, std::string_view source) {
 }
 
 bool Model::Insert(std::optional<size_t> after, Feature const& feature) {
+	if (!after) {
+		auto manual = std::find_if(parts_.begin(), parts_.end(), [](Part const& part) {
+			return part.kind == PartKind::Text && part.origin == Origin::Manual;
+		});
+		if (manual != parts_.end()) {
+			size_t manual_part = std::distance(parts_.begin(), manual);
+			std::optional<size_t> preceding_item;
+			for (size_t i = 0; i < locations_.size(); ++i) {
+				if (locations_[i].part >= manual_part) break;
+				preceding_item = i;
+			}
+			if (preceding_item) return Paste(preceding_item, feature.source);
+
+			auto inserted = ParseParts(feature.source);
+			if (inserted.empty()) return false;
+			for (auto& part : inserted) part.origin = Origin::Gui;
+			parts_.insert(parts_.begin() + manual_part,
+				std::make_move_iterator(inserted.begin()),
+				std::make_move_iterator(inserted.end()));
+			dirty_ = true;
+			RebuildItems();
+			return true;
+		}
+	}
 	return Paste(after, feature.source);
 }
 
