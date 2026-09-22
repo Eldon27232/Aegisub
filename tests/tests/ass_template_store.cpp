@@ -80,6 +80,7 @@ TEST(ass_template_store, saving_a_line_extracts_structure_and_replaces_its_body)
 		"{\\an8\\fs50\\fscx0\\fscy0\\t(0,250,\\fscx100\\fscy100)"
 		"\\3c&H0762ED&\\pos(500,500)}\\n{{正文}}",
 		structure);
+	EXPECT_EQ(structure, ass::templates::MakeStructure(structure));
 	EXPECT_EQ(std::string::npos, structure.find("辉夜酱太可爱了"));
 
 	auto parameters = ass::templates::ExtractParameters(structure);

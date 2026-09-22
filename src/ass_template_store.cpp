@@ -153,13 +153,10 @@ std::vector<Entry> Decode(std::string_view source, Scope scope) {
 }
 
 std::string MakeStructure(std::string_view source) {
-	auto document = ast::Document::Parse(source);
-	for (auto const& segment : document.Segments()) {
-		if (segment.Kind() == ast::SegmentKind::Text &&
-			segment.Text().find(BodyPlaceholder) != std::string::npos)
-			return std::string(source);
-	}
+	if (source.find(BodyPlaceholder) != std::string_view::npos)
+		return std::string(source);
 
+	auto document = ast::Document::Parse(source);
 	std::string result;
 	bool has_body = false;
 	for (auto const& segment : document.Segments()) {
@@ -214,12 +211,13 @@ std::vector<Parameter> ExtractParameters(std::string_view source) {
 	auto document = ast::Document::Parse(source);
 	std::vector<Parameter> result;
 	std::map<std::string, size_t> occurrences;
+	bool has_body_placeholder = source.find(BodyPlaceholder) != std::string_view::npos;
 	size_t text_index = 0;
 	for (auto const& segment : document.Segments()) {
 		if (segment.Kind() == ast::SegmentKind::Override && segment.Block())
 			extract_block(*segment.Block(), result, occurrences);
 		else if (segment.Kind() == ast::SegmentKind::Text && !segment.Text().empty()) {
-			if (segment.Text().find(BodyPlaceholder) == std::string::npos)
+			if (!has_body_placeholder)
 				result.push_back({"text:" + std::to_string(text_index), translated(_("Text")) + " " + std::to_string(text_index + 1), segment.Text()});
 			++text_index;
 		}
