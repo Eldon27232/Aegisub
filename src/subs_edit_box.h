@@ -116,6 +116,7 @@ class SubsEditBox final : public wxPanel {
 	bool laying_out_blocks = false;
 	wxPanel *block_panel;
 	std::unique_ptr<ass::blocks::Model> block_model;
+	wxTextCtrl *body_text_ctrl = nullptr;
 
 	wxSizer *top_sizer;
 	wxSizer *middle_right_sizer;
@@ -129,7 +130,7 @@ class SubsEditBox final : public wxPanel {
 	void CommitTimes(TimeField field);
 	/// @brief Commits the current edit box contents
 	/// @param desc Undo description to use
-	void CommitText(wxString const& desc);
+	void CommitText(wxString const& desc, int extra_type = 0);
 	void Commit(wxString const& desc, int type, bool amend, AssDialogue *line);
 
 	/// Last commit ID for undo coalescing
@@ -160,6 +161,8 @@ class SubsEditBox final : public wxPanel {
 	void OnChange(wxStyledTextEvent &event);
 	void OnKeyDown(wxKeyEvent &event);
 	void OnBlockNew(wxCommandEvent&);
+	void OnNewText(wxCommandEvent&);
+	void FocusTextBody();
 	void OnBlockContext(size_t row);
 	void SelectBlock(size_t row, bool control, bool shift);
 	void PaintBlockSelection();
@@ -168,6 +171,8 @@ class SubsEditBox final : public wxPanel {
 	void OnShowAssSource(wxCommandEvent&);
 	void RefreshBlocks();
 	void ApplyBlockChange(wxString const& desc, bool rebuild = true);
+	std::string BlockOriginMetadata(AssDialogue const *dialogue) const;
+	void StoreBlockOriginMetadata();
 	std::vector<size_t> SelectedBlocks() const;
 	void CopyBlocks();
 	void CutBlocks();

@@ -85,6 +85,32 @@ struct grid_line_next_create final : public Command {
 	}
 };
 
+struct grid_line_new_text final : public Command {
+	CMD_NAME("grid/line/new/text")
+	STR_MENU("New Text")
+	STR_DISP("New Text")
+	STR_HELP("Create a new text subtitle after the active line")
+
+	void operator()(agi::Context *c) override {
+		AudioTimingController *tc = c->audioController->GetTimingController();
+		if (tc)
+			tc->Commit();
+
+		AssDialogue *cur = c->selectionController->GetActiveLine();
+		if (!cur) return;
+
+		auto newline = new AssDialogue;
+		newline->Start = cur->End;
+		newline->End = cur->End + OPT_GET("Timing/Default Duration")->GetInt();
+		newline->Style = cur->Style;
+
+		auto pos = c->ass->iterator_to(*cur);
+		c->ass->Events.insert(++pos, *newline);
+		c->ass->Commit(_("new text subtitle"), AssFile::COMMIT_DIAG_ADDREM);
+		c->selectionController->SetSelectionAndActive({newline}, newline);
+	}
+};
+
 struct grid_line_prev final : public Command {
 	CMD_NAME("grid/line/prev")
 	STR_MENU("Previous Line")
@@ -560,6 +586,7 @@ namespace cmd {
 	void init_grid() {
 		reg(std::make_unique<grid_line_next>());
 		reg(std::make_unique<grid_line_next_create>());
+		reg(std::make_unique<grid_line_new_text>());
 		reg(std::make_unique<grid_line_prev>());
 		reg(std::make_unique<grid_sort_actor>());
 		reg(std::make_unique<grid_sort_effect>());

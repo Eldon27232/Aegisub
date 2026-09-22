@@ -69,3 +69,46 @@ TEST(ass_template_store, extracts_and_applies_common_parameters_through_ast) {
 		"\\3c&H112233&\\pos(640,500)\\vendor(keep)}\\n替换正文",
 		applied);
 }
+
+TEST(ass_template_store, saving_a_line_extracts_structure_and_replaces_its_body) {
+	std::string source =
+		"{\\an8\\fs50\\fscx0\\fscy0\\t(0,250,\\fscx100\\fscy100)"
+		"\\3c&H0762ED&\\pos(500,500)}\\n辉夜酱太可爱了（4,000点）";
+
+	auto structure = ass::templates::MakeStructure(source);
+	EXPECT_EQ(
+		"{\\an8\\fs50\\fscx0\\fscy0\\t(0,250,\\fscx100\\fscy100)"
+		"\\3c&H0762ED&\\pos(500,500)}\\n{{正文}}",
+		structure);
+	EXPECT_EQ(structure, ass::templates::MakeStructure(structure));
+	EXPECT_EQ(std::string::npos, structure.find("辉夜酱太可爱了"));
+
+	auto parameters = ass::templates::ExtractParameters(structure);
+	EXPECT_TRUE(std::any_of(parameters.begin(), parameters.end(), [](auto const& parameter) {
+		return parameter.id == "tag:\\pos:0:0";
+	}));
+	EXPECT_TRUE(std::none_of(parameters.begin(), parameters.end(), [](auto const& parameter) {
+		return parameter.id.rfind("text:", 0) == 0;
+	}));
+}
+
+TEST(ass_template_store, applying_structure_keeps_the_target_line_body) {
+	std::string source = "{\\an8\\fs50\\pos(500,500)}\\n辉夜酱太可爱了（4,000点）";
+	std::string target = "{\\i1}让我们厮守终生吧！（4,000点）";
+	auto body = ass::templates::ExtractBody(target);
+
+	EXPECT_EQ("让我们厮守终生吧！（4,000点）", body);
+	EXPECT_EQ(
+		"{\\an8\\fs50\\pos(500,500)}\\n让我们厮守终生吧！（4,000点）",
+		ass::templates::ApplyStructure(ass::templates::MakeStructure(source), body));
+	// Templates saved by the previous implementation are migrated on use.
+	EXPECT_EQ(
+		"{\\an8\\fs50\\pos(500,500)}\\n让我们厮守终生吧！（4,000点）",
+		ass::templates::ApplyStructure(source, body));
+}
+
+TEST(ass_template_store, applying_structure_to_a_new_line_does_not_copy_saved_body) {
+	std::string legacy = "{\\an8\\pos(500,500)}\\n辉夜酱太可爱了（4,000点）";
+
+	EXPECT_EQ("{\\an8\\pos(500,500)}\\n", ass::templates::ApplyStructure(legacy, {}));
+}

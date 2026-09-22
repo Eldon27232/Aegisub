@@ -9,4 +9,10 @@
 class wxWindow;
 namespace agi { struct Context; }
 
-void ShowAssTemplateManager(wxWindow *parent, agi::Context *context);
+enum class AssTemplateDialogResult {
+	Closed,
+	AppliedCurrent,
+	AppliedNew
+};
+
+AssTemplateDialogResult ShowAssTemplateManager(wxWindow *parent, agi::Context *context);

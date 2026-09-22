@@ -12,7 +12,10 @@
 #include <algorithm>
 #include <cctype>
 #include <charconv>
+#include <cstdint>
+#include <iomanip>
 #include <iterator>
+#include <sstream>
 #include <unordered_map>
 
 namespace ass::blocks {
@@ -73,6 +76,74 @@ void sort_unique(T& values) {
 	values.erase(std::unique(values.begin(), values.end()), values.end());
 }
 
+struct OriginRun {
+	Origin origin;
+	size_t length;
+};
+
+uint64_t source_hash(std::string_view source) {
+	uint64_t hash = UINT64_C(14695981039346656037);
+	for (unsigned char byte : source) {
+		hash ^= byte;
+		hash *= UINT64_C(1099511628211);
+	}
+	return hash;
+}
+
+char origin_code(Origin origin) {
+	switch (origin) {
+		case Origin::Manual: return 'M';
+		case Origin::Gui: return 'G';
+		case Origin::Raw: return 'R';
+	}
+	return 'R';
+}
+
+std::optional<Origin> parse_origin(char code) {
+	switch (code) {
+		case 'M': return Origin::Manual;
+		case 'G': return Origin::Gui;
+		case 'R': return Origin::Raw;
+		default: return {};
+	}
+}
+
+std::optional<std::vector<OriginRun>> parse_origin_metadata(
+	std::string_view source, std::string_view metadata) {
+	if (metadata.substr(0, 3) != "v1;") return {};
+	auto hash_end = metadata.find(';', 3);
+	if (hash_end == std::string_view::npos || hash_end != 19) return {};
+	uint64_t expected_hash = 0;
+	auto hash_text = metadata.substr(3, hash_end - 3);
+	auto [hash_cursor, hash_error] = std::from_chars(
+		hash_text.data(), hash_text.data() + hash_text.size(), expected_hash, 16);
+	if (hash_error != std::errc() || hash_cursor != hash_text.data() + hash_text.size()
+		|| expected_hash != source_hash(source))
+		return {};
+
+	std::vector<OriginRun> runs;
+	size_t offset = hash_end + 1;
+	size_t covered = 0;
+	while (offset < metadata.size()) {
+		auto origin = parse_origin(metadata[offset++]);
+		if (!origin) return {};
+		auto end = metadata.find(',', offset);
+		if (end == std::string_view::npos) end = metadata.size();
+		if (end == offset) return {};
+		size_t length = 0;
+		auto [cursor, error] = std::from_chars(
+			metadata.data() + offset, metadata.data() + end, length);
+		if (error != std::errc() || cursor != metadata.data() + end
+			|| length > source.size() - covered)
+			return {};
+		runs.push_back({*origin, length});
+		covered += length;
+		offset = end + (end < metadata.size());
+	}
+	if (runs.empty() || covered != source.size()) return {};
+	return runs;
+}
+
 struct ColourLocation {
 	ast::OverrideBlock *scope;
 	size_t node;
@@ -126,11 +197,21 @@ std::vector<Model::Part> Model::ParseParts(std::string_view source) {
 		Part part;
 		part.original = segment.Serialize();
 		switch (segment.Kind()) {
-			case ast::SegmentKind::Text: part.kind = PartKind::Text; break;
-			case ast::SegmentKind::Comment: part.kind = PartKind::Comment; break;
-			case ast::SegmentKind::Drawing: part.kind = PartKind::Drawing; break;
+			case ast::SegmentKind::Text:
+				part.kind = PartKind::Text;
+				part.origin = Origin::Manual;
+				break;
+			case ast::SegmentKind::Comment:
+				part.kind = PartKind::Comment;
+				part.origin = Origin::Raw;
+				break;
+			case ast::SegmentKind::Drawing:
+				part.kind = PartKind::Drawing;
+				part.origin = Origin::Raw;
+				break;
 			case ast::SegmentKind::Override: {
 				part.kind = PartKind::Override;
+				part.origin = Origin::Gui;
 				if (auto const* block = segment.Block()) {
 					part.nodes.reserve(block->Nodes().size());
 					for (auto const& node : block->Nodes()) {
@@ -159,6 +240,83 @@ std::string Model::SerializePart(Part const& part) {
 void Model::SetSource(std::string source) {
 	original_ = std::move(source);
 	parts_ = ParseParts(original_);
+	if (std::none_of(parts_.begin(), parts_.end(), [](Part const& part) {
+		return part.kind == PartKind::Text;
+	})) {
+		Part part;
+		part.kind = PartKind::Text;
+		part.origin = Origin::Manual;
+		parts_.push_back(std::move(part));
+	}
+	dirty_ = false;
+	RebuildItems();
+}
+
+void Model::SetSourceWithManualSpan(std::string source, size_t offset, size_t length) {
+	if (offset > source.size() || length > source.size() - offset) {
+		SetStoredSource(std::move(source), {});
+		return;
+	}
+
+	original_ = std::move(source);
+	parts_.clear();
+	auto append_structure = [this](std::string_view text) {
+		auto parsed = ParseParts(text);
+		for (auto& part : parsed) {
+			if (part.kind != PartKind::Comment && part.kind != PartKind::Drawing &&
+				part.kind != PartKind::Raw)
+				part.origin = Origin::Gui;
+		}
+		parts_.insert(parts_.end(),
+			std::make_move_iterator(parsed.begin()),
+			std::make_move_iterator(parsed.end()));
+	};
+
+	auto view = std::string_view(original_);
+	append_structure(view.substr(0, offset));
+	Part manual;
+	manual.kind = PartKind::Text;
+	manual.origin = Origin::Manual;
+	manual.original = std::string(view.substr(offset, length));
+	parts_.push_back(std::move(manual));
+	append_structure(view.substr(offset + length));
+	dirty_ = false;
+	RebuildItems();
+}
+
+void Model::SetStoredSource(std::string source, std::string_view origin_metadata) {
+	original_ = std::move(source);
+	parts_.clear();
+	auto append_opaque = [this](std::string_view text, Origin origin) {
+		Part part;
+		part.kind = origin == Origin::Raw ? PartKind::Raw : PartKind::Text;
+		part.origin = origin;
+		part.original = std::string(text);
+		parts_.push_back(std::move(part));
+	};
+
+	auto runs = parse_origin_metadata(original_, origin_metadata);
+	if (!runs) {
+		append_opaque(original_, Origin::Manual);
+	}
+	else {
+		size_t offset = 0;
+		for (auto const& run : *runs) {
+			auto text = std::string_view(original_).substr(offset, run.length);
+			if (run.origin != Origin::Gui) {
+				append_opaque(text, run.origin);
+			}
+			else {
+				auto parsed = ParseParts(text);
+				for (auto& part : parsed) part.origin = Origin::Gui;
+				parts_.insert(parts_.end(),
+					std::make_move_iterator(parsed.begin()),
+					std::make_move_iterator(parsed.end()));
+			}
+			offset += run.length;
+		}
+	}
+	if (parts_.empty()) append_opaque({}, Origin::Manual);
 	dirty_ = false;
 	RebuildItems();
 }
@@ -168,6 +326,28 @@ std::string Model::Serialize() const {
 	std::string result;
 	for (auto const& part : parts_) result += SerializePart(part);
 	return result;
+}
+
+std::string Model::OriginMetadata() const {
+	std::string source = Serialize();
+	std::vector<OriginRun> runs;
+	for (auto const& part : parts_) {
+		size_t length = SerializePart(part).size();
+		if (!runs.empty() && runs.back().origin == part.origin)
+			runs.back().length += length;
+		else
+			runs.push_back({part.origin, length});
+	}
+	if (runs.empty()) runs.push_back({Origin::Manual, source.size()});
+
+	std::ostringstream result;
+	result << "v1;" << std::hex << std::setfill('0') << std::setw(16)
+		<< source_hash(source) << ';' << std::dec;
+	for (size_t i = 0; i < runs.size(); ++i) {
+		if (i) result << ',';
+		result << origin_code(runs[i].origin) << runs[i].length;
+	}
+	return result.str();
 }
 
 void Model::RebuildItems() {
@@ -182,11 +362,13 @@ void Model::RebuildItems() {
 				item.source = node.source;
 				if (node.tag && node.known) {
 					item.kind = ItemKind::Tag;
+					item.origin = part.origin == Origin::Gui ? Origin::Gui : Origin::Raw;
 					item.label = label_for_tag(node.name);
 					item.category = category_for_tag(node.name);
 				}
 				else {
 					item.kind = ItemKind::Raw;
+					item.origin = Origin::Raw;
 					item.label = translated(_("Raw ASS"));
 					item.category = translated(_("Advanced"));
 				}
@@ -198,6 +380,7 @@ void Model::RebuildItems() {
 
 		Item item;
 		item.source = SerializePart(part);
+		item.origin = part.origin;
 		switch (part.kind) {
 			case PartKind::Text:
 				item.kind = ItemKind::Text; item.label = translated(_("Text")); item.category = translated(_("Text")); break;
@@ -206,6 +389,8 @@ void Model::RebuildItems() {
 			case PartKind::Drawing:
 				item.kind = ItemKind::Drawing; item.label = translated(_("ASS Drawing")); item.category = translated(_("Drawing")); break;
 			case PartKind::Override:
+				item.kind = ItemKind::Raw; item.label = translated(_("Raw ASS")); item.category = translated(_("Advanced")); break;
+			case PartKind::Raw:
 				item.kind = ItemKind::Raw; item.label = translated(_("Raw ASS")); item.category = translated(_("Advanced")); break;
 		}
 		items_.push_back(std::move(item));
@@ -277,8 +462,16 @@ bool Model::Delete(std::vector<size_t> selection) {
 			parts_[part_index].nodes.erase(parts_[part_index].nodes.begin() + nodes[i]);
 		if (parts_[part_index].nodes.empty())
 			parts_.erase(parts_.begin() + part_index);
-		else
+		else {
 			parts_[part_index].dirty = true;
+			parts_[part_index].origin = Origin::Gui;
+		}
+	}
+	if (parts_.empty()) {
+		Part part;
+		part.kind = PartKind::Text;
+		part.origin = Origin::Manual;
+		parts_.push_back(std::move(part));
 	}
 	dirty_ = true;
 	RebuildItems();
@@ -292,6 +485,7 @@ bool Model::Paste(std::optional<size_t> after, std::string_view source) {
 		normalized = '{' + normalized + '}';
 	auto inserted = ParseParts(normalized);
 	if (inserted.empty()) return false;
+	for (auto& part : inserted) part.origin = Origin::Gui;
 
 	if (!after || *after >= locations_.size()) {
 		parts_.insert(parts_.end(), std::make_move_iterator(inserted.begin()), std::make_move_iterator(inserted.end()));
@@ -304,6 +498,7 @@ bool Model::Paste(std::optional<size_t> after, std::string_view source) {
 				std::make_move_iterator(inserted.front().nodes.begin()),
 				std::make_move_iterator(inserted.front().nodes.end()));
 			part.dirty = true;
+			part.origin = Origin::Gui;
 		}
 		else if (!location.is_node) {
 			parts_.insert(parts_.begin() + location.part + 1,
@@ -315,6 +510,7 @@ bool Model::Paste(std::optional<size_t> after, std::string_view source) {
 			right.dirty = true;
 			parts_[location.part].nodes.erase(parts_[location.part].nodes.begin() + location.node + 1, parts_[location.part].nodes.end());
 			parts_[location.part].dirty = true;
+			parts_[location.part].origin = Origin::Gui;
 
 			auto position = parts_.begin() + location.part + 1;
 			position = parts_.insert(position,
@@ -336,6 +532,7 @@ bool Model::Replace(size_t item, std::string_view source) {
 	if (!location.is_node) {
 		auto replacement = ParseParts(source);
 		if (replacement.empty()) return false;
+		for (auto& part : replacement) part.origin = Origin::Gui;
 		parts_.erase(parts_.begin() + location.part);
 		parts_.insert(parts_.begin() + location.part,
 			std::make_move_iterator(replacement.begin()), std::make_move_iterator(replacement.end()));
@@ -355,13 +552,53 @@ bool Model::Replace(size_t item, std::string_view source) {
 		part.nodes.insert(part.nodes.begin() + location.node,
 			std::make_move_iterator(replacement.begin()), std::make_move_iterator(replacement.end()));
 		part.dirty = true;
+		part.origin = Origin::Gui;
 	}
 	dirty_ = true;
 	RebuildItems();
 	return true;
 }
 
+bool Model::ReplaceManual(size_t item, std::string_view source) {
+	if (item >= locations_.size()) return false;
+	auto location = locations_[item];
+	if (location.is_node || parts_[location.part].kind != PartKind::Text) return false;
+
+	Part replacement;
+	replacement.kind = PartKind::Text;
+	replacement.origin = Origin::Manual;
+	replacement.original = std::string(source);
+	parts_[location.part] = std::move(replacement);
+	dirty_ = true;
+	RebuildItems();
+	return true;
+}
+
 bool Model::Insert(std::optional<size_t> after, Feature const& feature) {
+	if (!after) {
+		auto manual = std::find_if(parts_.begin(), parts_.end(), [](Part const& part) {
+			return part.kind == PartKind::Text && part.origin == Origin::Manual;
+		});
+		if (manual != parts_.end()) {
+			size_t manual_part = std::distance(parts_.begin(), manual);
+			std::optional<size_t> preceding_item;
+			for (size_t i = 0; i < locations_.size(); ++i) {
+				if (locations_[i].part >= manual_part) break;
+				preceding_item = i;
+			}
+			if (preceding_item) return Paste(preceding_item, feature.source);
+
+			auto inserted = ParseParts(feature.source);
+			if (inserted.empty()) return false;
+			for (auto& part : inserted) part.origin = Origin::Gui;
+			parts_.insert(parts_.begin() + manual_part,
+				std::make_move_iterator(inserted.begin()),
+				std::make_move_iterator(inserted.end()));
+			dirty_ = true;
+			RebuildItems();
+			return true;
+		}
+	}
 	return Paste(after, feature.source);
 }
 
@@ -414,6 +651,7 @@ bool Model::SetColour(size_t item, std::vector<size_t> nested_path, agi::Color c
 	for (auto const& node : block.Nodes())
 		part.nodes.push_back({node.Serialize(), node.Name(), node.IsKnownTag(), node.Kind() == ast::OverrideNodeKind::Tag});
 	part.dirty = true;
+	part.origin = Origin::Gui;
 	dirty_ = true;
 	RebuildItems();
 	return true;

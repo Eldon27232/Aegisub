@@ -95,6 +95,14 @@ void apply_block(ast::OverrideBlock& block,
 	}
 }
 
+size_t leading_line_breaks(std::string_view text) {
+	size_t length = 0;
+	while (length + 1 < text.size() && text[length] == '\\' &&
+		(text[length + 1] == 'n' || text[length + 1] == 'N'))
+		length += 2;
+	return length;
+}
+
 } // namespace
 
 std::string Encode(std::vector<Entry> const& entries, Scope scope) {
@@ -144,16 +152,73 @@ std::vector<Entry> Decode(std::string_view source, Scope scope) {
 	return result;
 }
 
+std::string MakeStructure(std::string_view source) {
+	if (source.find(BodyPlaceholder) != std::string_view::npos)
+		return std::string(source);
+
+	auto document = ast::Document::Parse(source);
+	std::string result;
+	bool has_body = false;
+	for (auto const& segment : document.Segments()) {
+		if (segment.Kind() != ast::SegmentKind::Text) {
+			result += segment.Serialize();
+			continue;
+		}
+		if (has_body) continue;
+
+		auto const& text = segment.Text();
+		size_t prefix = leading_line_breaks(text);
+		result.append(text, 0, prefix);
+		if (prefix < text.size()) {
+			result += BodyPlaceholder;
+			has_body = true;
+		}
+	}
+	if (!has_body) result += BodyPlaceholder;
+	return result;
+}
+
+std::string ExtractBody(std::string_view source) {
+	auto document = ast::Document::Parse(source);
+	std::string result;
+	bool has_body = false;
+	for (auto const& segment : document.Segments()) {
+		if (segment.Kind() != ast::SegmentKind::Text) continue;
+
+		auto const& text = segment.Text();
+		size_t prefix = has_body ? 0 : leading_line_breaks(text);
+		if (prefix == text.size()) continue;
+		result.append(text, prefix, std::string::npos);
+		has_body = true;
+	}
+	return result;
+}
+
+std::string ApplyStructure(std::string_view structure, std::string_view body) {
+	auto reusable = MakeStructure(structure);
+	size_t placeholder = reusable.find(BodyPlaceholder);
+	if (placeholder == std::string::npos) return reusable;
+
+	std::string result;
+	result.reserve(reusable.size() - BodyPlaceholder.size() + body.size());
+	result.append(reusable, 0, placeholder);
+	result += body;
+	result.append(reusable, placeholder + BodyPlaceholder.size(), std::string::npos);
+	return result;
+}
+
 std::vector<Parameter> ExtractParameters(std::string_view source) {
 	auto document = ast::Document::Parse(source);
 	std::vector<Parameter> result;
 	std::map<std::string, size_t> occurrences;
+	bool has_body_placeholder = source.find(BodyPlaceholder) != std::string_view::npos;
 	size_t text_index = 0;
 	for (auto const& segment : document.Segments()) {
 		if (segment.Kind() == ast::SegmentKind::Override && segment.Block())
 			extract_block(*segment.Block(), result, occurrences);
 		else if (segment.Kind() == ast::SegmentKind::Text && !segment.Text().empty()) {
-			result.push_back({"text:" + std::to_string(text_index), translated(_("Text")) + " " + std::to_string(text_index + 1), segment.Text()});
+			if (!has_body_placeholder)
+				result.push_back({"text:" + std::to_string(text_index), translated(_("Text")) + " " + std::to_string(text_index + 1), segment.Text()});
 			++text_index;
 		}
 	}
