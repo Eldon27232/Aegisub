@@ -223,11 +223,7 @@ bool AegisubApp::OnInit() {
 	}
 	theme::Initialize();
 
-#if defined(__WXMSW__) && wxVERSION_NUMBER >= 3300
-	if (theme::IsDark()) {
-		MSWEnableDarkMode(wxApp::DarkMode_Always);
-	}
-#endif
+	theme::InitializeNative();
 
 	// Init commands.
 	cmd::init_builtin_commands();

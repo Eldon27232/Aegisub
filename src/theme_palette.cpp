@@ -48,50 +48,50 @@ Palette const dark_plus {
 
 Palette const deep_gray {
 	Colour(0x292929), Colour(0x353535), Colour(0xf0f0f0), Colour(0xb1b1b1),
-	Colour(0x505050), Colour(0x66aee8), Colour(0x46637a), Colour(0xffffff),
+	Colour(0x505050), Colour(0xc4c7cb), Colour(0x55585e), Colour(0xffffff),
 	Colour(0x653030),
 
 	Colour(0x2b2b2b), Colour(0x383838), Colour(0x505050), Colour(0x354438),
-	Colour(0x364957), Colour(0x566359), Colour(0x354958), Colour(0x4a3d4c),
+	Colour(0x45474b), Colour(0x566359), Colour(0x42454a), Colour(0x555158),
 	Colour(0x333333), Colour(0xf0f0f0), Colour(0xffffff), Colour(0xff8b8b),
-	Colour(0x66aee8),
+	Colour(0xc4c7cb),
 
-	Colour(0x242424), Colour(0x79bfff), Colour(0x78838c), Colour(0x46637a),
+	Colour(0x242424), Colour(0xd0d3d8), Colour(0x78838c), Colour(0x55585e),
 	Colour(0xffd37d), Colour(0xff8585), Colour(0xcda1ff),
 
-	Colour(0x62a9e3), Colour(0xc0c0c0)
+	Colour(0xaeb4bd), Colour(0xc0c0c0)
 };
 
 Palette const oled_black {
 	Colour(0x000000), Colour(0x0a0a0a), Colour(0xf5f5f5), Colour(0xaaaaaa),
-	Colour(0x333333), Colour(0x42a5f5), Colour(0x123f62), Colour(0xffffff),
+	Colour(0x333333), Colour(0xedae95), Colour(0x683f33), Colour(0xffffff),
 	Colour(0x500f0f),
 
 	Colour(0x000000), Colour(0x101010), Colour(0x292929), Colour(0x102815),
-	Colour(0x0e2a40), Colour(0x29452f), Colour(0x102c43), Colour(0x331e35),
+	Colour(0x3b2823), Colour(0x29452f), Colour(0x452c24), Colour(0x493728),
 	Colour(0x080808), Colour(0xf5f5f5), Colour(0xffffff), Colour(0xff7373),
-	Colour(0x42a5f5),
+	Colour(0xedae95),
 
-	Colour(0x000000), Colour(0x5fb3ff), Colour(0x52616d), Colour(0x123f62),
-	Colour(0xffca5f), Colour(0xff5959), Colour(0xbe7cff),
+	Colour(0x000000), Colour(0xefb59c), Colour(0x52616d), Colour(0x683f33),
+	Colour(0xffca5f), Colour(0xff5959), Colour(0xdd9cbe),
 
-	Colour(0x2196f3), Colour(0x8f8f8f)
+	Colour(0xe5a084), Colour(0x8f8f8f)
 };
 
 Palette const light {
 	Colour(0xf3f3f3), Colour(0xffffff), Colour(0x202020), Colour(0x666666),
-	Colour(0xc5c5c5), Colour(0x0067c0), Colour(0xcce8ff), Colour(0x101010),
+	Colour(0xc5c5c5), Colour(0x087f68), Colour(0xbce6d7), Colour(0x101010),
 	Colour(0xfde7e9),
 
 	Colour(0xffffff), Colour(0xe9e9e9), Colour(0xd1d1d1), Colour(0xe9f5e8),
-	Colour(0xe5f1fb), Colour(0xcfe4cf), Colour(0xdcecf8), Colour(0xf2e2f2),
+	Colour(0xe0f3ea), Colour(0xcfe4cf), Colour(0xcde9df), Colour(0xf2e2f2),
 	Colour(0xf0f0f0), Colour(0x202020), Colour(0x101010), Colour(0xb42318),
-	Colour(0x0067c0),
+	Colour(0x087f68),
 
-	Colour(0xffffff), Colour(0x1877b7), Colour(0x8a959d), Colour(0xb8dcf7),
+	Colour(0xffffff), Colour(0x15876a), Colour(0x8a959d), Colour(0xc0e5d7),
 	Colour(0xa15c00), Colour(0xc62828), Colour(0x7440a8),
 
-	Colour(0x0078d4), Colour(0x666666)
+	Colour(0x17876c), Colour(0x666666)
 };
 
 std::string Normalize(std::string_view name) {

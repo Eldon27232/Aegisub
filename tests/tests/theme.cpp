@@ -78,3 +78,18 @@ TEST(theme_palette, text_has_readable_contrast_in_every_theme) {
 			<< theme::ThemeName(id);
 	}
 }
+
+TEST(theme_palette, themes_have_distinct_accent_families) {
+	auto const& blue = theme::GetPalette(theme::ThemeId::DarkPlus);
+	auto const& grey = theme::GetPalette(theme::ThemeId::DeepGray);
+	auto const& peach = theme::GetPalette(theme::ThemeId::OledBlack);
+	auto const& jade = theme::GetPalette(theme::ThemeId::Light);
+	EXPECT_GT(blue.accent.Blue(), blue.accent.Red() + 70);
+	EXPECT_LT(std::abs(int(grey.accent.Red()) - int(grey.accent.Blue())), 15);
+	EXPECT_GT(peach.accent.Red(), peach.accent.Blue() + 70);
+	EXPECT_GT(jade.accent.Green(), jade.accent.Red() + 70);
+	for (auto const* p : {&grey, &peach, &jade}) {
+		EXPECT_NE(blue.selection, p->selection);
+		EXPECT_EQ(p->accent, p->grid_active_border);
+	}
+}

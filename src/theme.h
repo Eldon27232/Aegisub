@@ -24,6 +24,9 @@ namespace theme {
 /// are deliberately applied on the next launch, together with native controls.
 void Initialize();
 
+/// Keep native menus, selection, and focus colours in the same palette.
+void InitializeNative();
+
 /// Theme selected in App/Theme. This remains safe during early startup and
 /// falls back to the native Light palette before preferences are available.
 ThemeId CurrentTheme();
