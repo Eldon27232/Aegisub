@@ -128,6 +128,7 @@ aegisub_src = files(
     'subtitle_format_encore.cpp',
     'subtitle_format_microdvd.cpp',
     'subtitle_format_srt.cpp',
+    'subtitle_mask_model.cpp',
     'subtitle_format_ssa.cpp',
     'subtitle_format_transtation.cpp',
     'subtitle_format_ttxt.cpp',
@@ -169,6 +170,7 @@ aegisub_src = files(
     'visual_tool_rotatez.cpp',
     'visual_tool_scale.cpp',
     'visual_tool_screen_mask.cpp',
+    'visual_tool_subtitle_mask.cpp',
     'visual_tool_vector_clip.cpp',
 )
 
