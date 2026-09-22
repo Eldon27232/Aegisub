@@ -34,6 +34,7 @@
 
 #include "subs_edit_box.h"
 
+#include "ass_block_editor_model.h"
 #include "ass_dialogue.h"
 #include "ass_file.h"
 #include "base_grid.h"
@@ -59,16 +60,23 @@
 #include <libaegisub/util.h>
 
 #include <functional>
+#include <optional>
 #include <unordered_set>
 
 #include <wx/bmpbuttn.h>
 #include <wx/button.h>
 #include <wx/checkbox.h>
+#include <wx/clipbrd.h>
+#include <wx/dialog.h>
 #include <wx/fontenum.h>
+#include <wx/listctrl.h>
+#include <wx/menu.h>
 #include <wx/radiobut.h>
+#include <wx/srchctrl.h>
 #include <wx/settings.h>
 #include <wx/sizer.h>
 #include <wx/spinctrl.h>
+#include <wx/textdlg.h>
 
 namespace {
 
@@ -96,6 +104,60 @@ void time_edit_char_hook(wxKeyEvent &event) {
 		event.Skip();
 }
 
+class BlockFeatureDialog final : public wxDialog {
+	wxSearchCtrl *search;
+	wxListCtrl *list;
+	std::vector<ass::blocks::Feature> filtered;
+
+	void Refresh() {
+		filtered = ass::blocks::Model::SearchFeatures(from_wx(search->GetValue()));
+		list->Freeze();
+		list->DeleteAllItems();
+		for (size_t i = 0; i < filtered.size(); ++i) {
+			auto const& feature = filtered[i];
+			long row = list->InsertItem(static_cast<long>(i), to_wx(feature.category));
+			list->SetItem(row, 1, to_wx(feature.name));
+			list->SetItem(row, 2, "\\" + to_wx(feature.tag));
+		}
+		if (!filtered.empty()) list->SetItemState(0, wxLIST_STATE_SELECTED, wxLIST_STATE_SELECTED);
+		for (int column = 0; column < 3; ++column) list->SetColumnWidth(column, wxLIST_AUTOSIZE_USEHEADER);
+		list->Thaw();
+	}
+
+public:
+	explicit BlockFeatureDialog(wxWindow *parent)
+	: wxDialog(parent, wxID_ANY, _("新建 ASS 方块"), wxDefaultPosition, wxDefaultSize,
+		wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER)
+	{
+		auto *sizer = new wxBoxSizer(wxVERTICAL);
+		search = new wxSearchCtrl(this, wxID_ANY);
+		search->SetDescriptiveText(_("搜索中文功能名或 ASS 标签，例如：原点、an、frz"));
+		search->ShowCancelButton(true);
+		sizer->Add(search, wxSizerFlags().Expand().Border(wxALL));
+
+		list = new wxListCtrl(this, wxID_ANY, wxDefaultPosition, FromDIP(wxSize(520, 360)),
+			wxLC_REPORT | wxLC_SINGLE_SEL | wxLC_HRULES | wxLC_VRULES);
+		list->InsertColumn(0, _("分类"));
+		list->InsertColumn(1, _("功能"));
+		list->InsertColumn(2, _("ASS 标签"));
+		sizer->Add(list, wxSizerFlags(1).Expand().Border(wxLEFT | wxRIGHT));
+		sizer->Add(CreateSeparatedButtonSizer(wxOK | wxCANCEL), wxSizerFlags().Expand().Border(wxALL));
+		SetSizerAndFit(sizer);
+		SetMinSize(FromDIP(wxSize(520, 360)));
+
+		search->Bind(wxEVT_TEXT, [this](wxCommandEvent&) { Refresh(); });
+		list->Bind(wxEVT_LIST_ITEM_ACTIVATED, [this](wxListEvent&) { EndModal(wxID_OK); });
+		Refresh();
+		search->SetFocus();
+	}
+
+	std::optional<ass::blocks::Feature> Selected() const {
+		long row = list->GetNextItem(-1, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED);
+		if (row < 0 || static_cast<size_t>(row) >= filtered.size()) return std::nullopt;
+		return filtered[static_cast<size_t>(row)];
+	}
+};
+
 // Passing a pointer-to-member directly to a function sometimes does not work
 // in VC++ 2015 Update 2, with it instead passing a null pointer
 const auto AssDialogue_Actor = &AssDialogue::Actor;
@@ -105,6 +167,7 @@ const auto AssDialogue_Effect = &AssDialogue::Effect;
 SubsEditBox::SubsEditBox(wxWindow *parent, agi::Context *context)
 : wxPanel(parent, -1, wxDefaultPosition, wxDefaultSize, wxTAB_TRAVERSAL | (theme::IsDark() ? wxBORDER_STATIC : wxRAISED_BORDER), "SubsEditBox")
 , c(context)
+, block_model(std::make_unique<ass::blocks::Model>())
 , undo_timer(GetEventHandler())
 {
 	using std::bind;
@@ -193,12 +256,34 @@ SubsEditBox::SubsEditBox(wxWindow *parent, agi::Context *context)
 	middle_right_sizer->Add(split_box, wxSizerFlags().Center().Left());
 
 	// Main sizer
-	wxSizer *main_sizer = new wxBoxSizer(wxVERTICAL);
+	main_sizer = new wxBoxSizer(wxVERTICAL);
 	main_sizer->Add(top_sizer,0,wxEXPAND | wxALL,3);
 	main_sizer->Add(middle_left_sizer,0,wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM,3);
 	main_sizer->Add(middle_right_sizer,0,wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM,3);
 
-	// Text editor
+	// Block editor and optional raw ASS source
+	block_panel = new wxPanel(this, wxID_ANY);
+	auto *block_sizer = new wxBoxSizer(wxVERTICAL);
+	auto *block_header = new wxBoxSizer(wxHORIZONTAL);
+	auto *new_block = new wxButton(block_panel, wxID_ANY, _("新建"));
+	new_block->SetToolTip(_("搜索并添加定位、字体、颜色、动画、裁剪等 ASS 功能"));
+	show_ass_source = new wxCheckBox(block_panel, wxID_ANY, _("显示 ASS 源码"));
+	show_ass_source->SetToolTip(_("在方块编辑器下方显示并直接编辑完整 ASS 源码"));
+	block_header->Add(new_block, wxSizerFlags().Border(wxRIGHT));
+	block_header->AddStretchSpacer();
+	block_header->Add(show_ass_source, wxSizerFlags().Center());
+	block_sizer->Add(block_header, wxSizerFlags().Expand().Border(wxBOTTOM, 3));
+
+	block_list = new wxListCtrl(block_panel, wxID_ANY, wxDefaultPosition, FromDIP(wxSize(300, 82)),
+		wxLC_REPORT | wxLC_HRULES | wxLC_VRULES);
+	block_list->InsertColumn(0, _("功能方块"));
+	block_list->InsertColumn(1, _("ASS 内容"));
+	block_list->InsertColumn(2, _("分类"));
+	block_list->SetToolTip(_("单击选择；Ctrl/Shift 多选；双击编辑；支持复制、剪切、粘贴和 Delete"));
+	block_sizer->Add(block_list, wxSizerFlags(1).Expand());
+	block_panel->SetSizer(block_sizer);
+	main_sizer->Add(block_panel, 1, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 3);
+
 	edit_ctrl = new SubsTextEditCtrl(this, FromDIP(wxSize(300,50)), (theme::IsDark() ? wxBORDER_SIMPLE : wxBORDER_SUNKEN), c);
 	edit_ctrl->Bind(wxEVT_CHAR_HOOK, &SubsEditBox::OnKeyDown, this);
 
@@ -207,6 +292,7 @@ SubsEditBox::SubsEditBox(wxWindow *parent, agi::Context *context)
 	main_sizer->Add(secondary_editor,1,wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM,3);
 	main_sizer->Add(edit_ctrl,1,wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM,3);
 	main_sizer->Hide(secondary_editor);
+	main_sizer->Hide(edit_ctrl);
 
 	bottom_sizer = new wxBoxSizer(wxHORIZONTAL);
 	bottom_sizer->Add(MakeBottomButton("edit/revert"), wxSizerFlags().Border(wxRIGHT));
@@ -220,6 +306,11 @@ SubsEditBox::SubsEditBox(wxWindow *parent, agi::Context *context)
 
 	edit_ctrl->Bind(wxEVT_STC_MODIFIED, &SubsEditBox::OnChange, this);
 	edit_ctrl->SetModEventMask(wxSTC_MOD_INSERTTEXT | wxSTC_MOD_DELETETEXT | wxSTC_STARTACTION);
+	new_block->Bind(wxEVT_BUTTON, &SubsEditBox::OnBlockNew, this);
+	show_ass_source->Bind(wxEVT_CHECKBOX, &SubsEditBox::OnShowAssSource, this);
+	block_list->Bind(wxEVT_LIST_ITEM_ACTIVATED, &SubsEditBox::OnBlockActivate, this);
+	block_list->Bind(wxEVT_LIST_ITEM_RIGHT_CLICK, &SubsEditBox::OnBlockContext, this);
+	block_list->Bind(wxEVT_CHAR_HOOK, &SubsEditBox::OnBlockKeyDown, this);
 
 	Bind(wxEVT_TEXT, &SubsEditBox::OnLayerEnter, this, layer->GetId());
 	Bind(wxEVT_SPINCTRL, &SubsEditBox::OnLayerEnter, this, layer->GetId());
@@ -241,7 +332,7 @@ SubsEditBox::SubsEditBox(wxWindow *parent, agi::Context *context)
 	 });
 
 	context->textSelectionController->SetControl(edit_ctrl);
-	edit_ctrl->SetFocus();
+	block_list->SetFocus();
 
 	bool show_original = OPT_GET("Subtitle/Show Original")->GetBool();
 	if (show_original) {
@@ -354,6 +445,8 @@ void SubsEditBox::UpdateFields(int type, bool repopulate_lists) {
 
 	if (type & AssFile::COMMIT_DIAG_TEXT) {
 		edit_ctrl->SetTextTo(line->Text);
+		block_model->SetSource(line->Text);
+		RefreshBlocks();
 		UpdateCharacterCount(line->Text);
 	}
 
@@ -440,12 +533,147 @@ void SubsEditBox::OnKeyDown(wxKeyEvent &event) {
 		hotkey::check("Subtitle Edit Box", c, event);
 }
 
+std::vector<size_t> SubsEditBox::SelectedBlocks() const {
+	std::vector<size_t> result;
+	long row = -1;
+	while ((row = block_list->GetNextItem(row, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED)) != -1)
+		result.push_back(static_cast<size_t>(row));
+	return result;
+}
+
+void SubsEditBox::RefreshBlocks() {
+	block_list->Freeze();
+	block_list->DeleteAllItems();
+	auto const& items = block_model->Items();
+	for (size_t i = 0; i < items.size(); ++i) {
+		auto const& item = items[i];
+		long row = block_list->InsertItem(static_cast<long>(i), to_wx(item.label));
+		block_list->SetItem(row, 1, to_wx(item.source));
+		block_list->SetItem(row, 2, to_wx(item.category));
+	}
+	block_list->SetColumnWidth(0, FromDIP(150));
+	block_list->SetColumnWidth(2, FromDIP(90));
+	block_list->SetColumnWidth(1, std::max(FromDIP(180), block_list->GetClientSize().x - FromDIP(250)));
+	block_list->Thaw();
+}
+
+void SubsEditBox::ApplyBlockChange(wxString const& desc) {
+	auto source = block_model->Serialize();
+	edit_ctrl->SetTextTo(source);
+	if (line) {
+		commit_id = -1;
+		CommitText(desc);
+		UpdateCharacterCount(source);
+	}
+	RefreshBlocks();
+}
+
+void SubsEditBox::OnBlockNew(wxCommandEvent&) {
+	BlockFeatureDialog dialog(this);
+	if (dialog.ShowModal() != wxID_OK) return;
+	auto feature = dialog.Selected();
+	if (!feature) return;
+	auto selected = SelectedBlocks();
+	std::optional<size_t> after;
+	if (!selected.empty()) after = selected.back();
+	if (block_model->Insert(after, *feature))
+		ApplyBlockChange(_("添加 ASS 方块"));
+}
+
+void SubsEditBox::OnBlockActivate(wxListEvent& event) {
+	long row = event.GetIndex();
+	if (row < 0 || static_cast<size_t>(row) >= block_model->Items().size()) return;
+	auto const& item = block_model->Items()[static_cast<size_t>(row)];
+	wxTextEntryDialog dialog(this, _("修改这个方块对应的 ASS 内容："), _("编辑 ASS 方块"),
+		to_wx(item.source), wxOK | wxCANCEL | wxCENTRE | wxTE_MULTILINE);
+	dialog.SetSize(FromDIP(wxSize(520, 220)));
+	if (dialog.ShowModal() == wxID_OK && block_model->Replace(static_cast<size_t>(row), from_wx(dialog.GetValue())))
+		ApplyBlockChange(_("修改 ASS 方块"));
+}
+
+void SubsEditBox::CopyBlocks() {
+	auto source = block_model->Copy(SelectedBlocks());
+	if (source.empty() || !wxTheClipboard->Open()) return;
+	wxTheClipboard->SetData(new wxTextDataObject(to_wx(source)));
+	wxTheClipboard->Close();
+}
+
+void SubsEditBox::CutBlocks() {
+	auto selected = SelectedBlocks();
+	auto source = block_model->Copy(selected);
+	if (source.empty() || !wxTheClipboard->Open()) return;
+	wxTheClipboard->SetData(new wxTextDataObject(to_wx(source)));
+	wxTheClipboard->Close();
+	if (block_model->Delete(std::move(selected)))
+		ApplyBlockChange(_("剪切 ASS 方块"));
+}
+
+void SubsEditBox::PasteBlocks() {
+	if (!wxTheClipboard->Open()) return;
+	wxTextDataObject data;
+	bool available = wxTheClipboard->GetData(data);
+	wxTheClipboard->Close();
+	if (!available) return;
+	auto selected = SelectedBlocks();
+	std::optional<size_t> after;
+	if (!selected.empty()) after = selected.back();
+	if (block_model->Paste(after, from_wx(data.GetText())))
+		ApplyBlockChange(_("粘贴 ASS 方块"));
+}
+
+void SubsEditBox::DeleteBlocks() {
+	if (block_model->Delete(SelectedBlocks()))
+		ApplyBlockChange(_("删除 ASS 方块"));
+}
+
+void SubsEditBox::OnBlockKeyDown(wxKeyEvent& event) {
+	if (event.ControlDown()) {
+		switch (event.GetKeyCode()) {
+			case 'C': CopyBlocks(); return;
+			case 'X': CutBlocks(); return;
+			case 'V': PasteBlocks(); return;
+			default: break;
+		}
+	}
+	if (event.GetKeyCode() == WXK_DELETE) {
+		DeleteBlocks();
+		return;
+	}
+	event.Skip();
+}
+
+void SubsEditBox::OnBlockContext(wxListEvent& event) {
+	if (event.GetIndex() >= 0 && !(block_list->GetItemState(event.GetIndex(), wxLIST_STATE_SELECTED) & wxLIST_STATE_SELECTED))
+		block_list->SetItemState(event.GetIndex(), wxLIST_STATE_SELECTED, wxLIST_STATE_SELECTED);
+	wxMenu menu;
+	menu.Append(wxID_COPY, _("复制"));
+	menu.Append(wxID_CUT, _("剪切"));
+	menu.Append(wxID_PASTE, _("粘贴"));
+	menu.AppendSeparator();
+	menu.Append(wxID_DELETE, _("删除"));
+	menu.Bind(wxEVT_MENU, [this](wxCommandEvent&) { CopyBlocks(); }, wxID_COPY);
+	menu.Bind(wxEVT_MENU, [this](wxCommandEvent&) { CutBlocks(); }, wxID_CUT);
+	menu.Bind(wxEVT_MENU, [this](wxCommandEvent&) { PasteBlocks(); }, wxID_PASTE);
+	menu.Bind(wxEVT_MENU, [this](wxCommandEvent&) { DeleteBlocks(); }, wxID_DELETE);
+	PopupMenu(&menu);
+}
+
+void SubsEditBox::OnShowAssSource(wxCommandEvent&) {
+	Freeze();
+	main_sizer->Show(edit_ctrl, show_ass_source->IsChecked());
+	main_sizer->Layout();
+	if (auto *parent_sizer = GetParent()->GetSizer()) parent_sizer->Layout();
+	Thaw();
+}
+
 void SubsEditBox::OnChange(wxStyledTextEvent &event) {
 	if (line && edit_ctrl->GetTextRaw().data() != line->Text.get()) {
 		if (event.GetModificationType() & wxSTC_STARTACTION)
 			commit_id = -1;
 		CommitText(_("modify text"));
 		UpdateCharacterCount(line->Text);
+		block_model->SetSource(line->Text);
+		RefreshBlocks();
 	}
 }
 
@@ -579,6 +807,8 @@ void SubsEditBox::SetControlsState(bool state) {
 	if (!state) {
 		wxEventBlocker blocker(this);
 		edit_ctrl->SetTextTo("");
+		block_model->SetSource("");
+		RefreshBlocks();
 	}
 }
 
