@@ -30,14 +30,14 @@ ColourButton::ColourButton(wxWindow *parent, wxSize const& size, bool alpha, agi
 {
 	UpdateBitmap();
 	Bind(wxEVT_BUTTON, [=, this](wxCommandEvent&) {
-		GetColorFromUser(GetParent(), colour, alpha, [this](agi::Color new_color) {
+		ShowColourPopup(this, colour, [this](agi::Color new_color) {
 			colour = new_color;
 			UpdateBitmap();
 
 			ValueEvent<agi::Color> evt(EVT_COLOR, GetId(), colour);
 			evt.SetEventObject(this);
 			AddPendingEvent(evt);
-		}, context);
+		}, context, alpha);
 	});
 }
 

@@ -37,7 +37,6 @@
 #include "include/aegisub/context.h"
 #include "libresrc/libresrc.h"
 #include "options.h"
-#include "persist_location.h"
 #include "project.h"
 #include "theme.h"
 #include "utils.h"
@@ -63,7 +62,10 @@
 #include <wx/dcclient.h>
 #include <wx/dcmemory.h>
 #include <wx/dcscreen.h>
-#include <wx/dialog.h>
+#include <wx/popupwin.h>
+#include <wx/display.h>
+#include <wx/slider.h>
+#include <wx/weakref.h>
 #include <wx/event.h>
 #include <wx/image.h>
 #include <wx/rawbmp.h>
@@ -495,8 +497,22 @@ void ColorPickerScreenDropper::DropFromScreenXY(int x, int y) {
 
 wxDEFINE_EVENT(EVT_OS_SELECT, ValueEvent<agi::Color>);
 
-class DialogColorPicker final : public wxDialog {
-	std::unique_ptr<PersistLocation> persist;
+class DialogColorPicker final : public wxPopupTransientWindow {
+	bool initialized = false;
+	bool dismissed = false;
+	std::function<void()> on_dismiss;
+	wxSlider *hsv_sliders[3];
+	wxSlider *opacity_slider;
+	void NotifyChanged() { if (initialized && callback) callback(cur_color); }
+	void OnDismiss() override {
+		if (dismissed) return;
+		dismissed = true;
+		AddColorToRecent();
+		callback = {};
+		auto finished = std::move(on_dismiss);
+		Destroy();
+		if (finished) finished();
+	}
 
 	agi::Color cur_color; ///< Currently selected colour
 
@@ -588,9 +604,10 @@ class DialogColorPicker final : public wxDialog {
 
 public:
 	DialogColorPicker(wxWindow *parent, agi::Color initial_color, std::function<void (agi::Color)> callback,
-		bool alpha, agi::Context const *context);
+		bool alpha, agi::Context const *context, std::function<void()> on_dismiss);
 	~DialogColorPicker();
 
+	void ClosePopup() { Dismiss(); OnDismiss(); }
 	void SetColor(agi::Color new_color);
 	void AddColorToRecent();
 };
@@ -619,207 +636,165 @@ static wxBitmap make_slider(Func func) {
 }
 
 DialogColorPicker::DialogColorPicker(wxWindow *parent, agi::Color initial_color, std::function<void (agi::Color)> callback,
-	bool alpha, agi::Context const *context)
-: wxDialog(parent, -1, _("Select Color"))
+	bool alpha, agi::Context const *context, std::function<void()> on_dismiss)
+: wxPopupTransientWindow(parent, wxBORDER_SIMPLE | wxPU_CONTAINS_CONTROLS)
+, on_dismiss(std::move(on_dismiss))
 , callback(std::move(callback))
 {
-	// generate spectrum slider bar images
+	SetName("ColourPopup");
+	SetBackgroundColour(theme::GetPalette().window_background);
+	SetForegroundColour(theme::GetPalette().text);
+	// Reuse the existing spectrum, conversion and eyedropper implementation.
 	for (int i = 0; i < 3; ++i) {
-		rgb_slider[i] = make_slider([=](int y, unsigned char *rgb) {
-			memset(rgb, 0, 3);
-			rgb[i] = y;
-		});
+		rgb_slider[i] = make_slider([=](int y, unsigned char *rgb) { memset(rgb, 0, 3); rgb[i] = y; });
 	}
 	hsl_slider = make_slider([](int y, unsigned char *rgb) { memset(rgb, y, 3); });
 	hsv_slider = make_slider([](int y, unsigned char *rgb) { hsv_to_rgb(y, 255, 255, rgb, rgb + 1, rgb + 2); });
 
-	// Create the controls for the dialog
-	wxStaticBoxSizer *spectrum_box_sizer = new wxStaticBoxSizer(wxVERTICAL, this, _("Color spectrum"));
-	wxWindow *spectrum_box = spectrum_box_sizer->GetStaticBox();
+	auto main = new wxBoxSizer(wxHORIZONTAL);
+	auto left = new wxBoxSizer(wxVERTICAL);
+	auto right = new wxBoxSizer(wxVERTICAL);
+	auto header = new wxBoxSizer(wxHORIZONTAL);
+	preview_box = new wxStaticBitmap(this, -1, wxBitmap(40, 40, 24), wxDefaultPosition, wxSize(40, 40), STATIC_BORDER_FLAG);
+	header->Add(preview_box, 0, wxRIGHT, 8);
+	header->Add(new wxStaticText(this, -1, _("Color - changes apply immediately")), 1, wxALIGN_CENTER_VERTICAL);
+	left->Add(header, 0, wxEXPAND | wxBOTTOM, 6);
+	spectrum = new ColorPickerSpectrum(this, PickerDirection::HorzVert, wxSize(256, 256));
+	slider = new ColorPickerSpectrum(this, PickerDirection::Vert, wxSize(slider_width, 256));
+	alpha_slider = new ColorPickerSpectrum(this, PickerDirection::Vert, wxSize(slider_width, 256));
+	alpha_slider->Hide();
+	colorspace_choice = new wxChoice(this, -1);
+	for (auto name : {"R", "G", "B", "HSL", "HSV"}) colorspace_choice->Append(name);
+	colorspace_choice->SetSelection(4);
+	colorspace_choice->Hide();
+	auto spectrum_row = new wxBoxSizer(wxHORIZONTAL);
+	spectrum_row->Add(spectrum);
+	spectrum_row->Add(slider, 0, wxLEFT, 5);
+	left->Add(spectrum_row);
 
-	spectrum = new ColorPickerSpectrum(spectrum_box, PickerDirection::HorzVert, wxSize(256, 256));
-	slider = new ColorPickerSpectrum(spectrum_box, PickerDirection::Vert, wxSize(slider_width, 256));
-	alpha_slider = new ColorPickerSpectrum(spectrum_box, PickerDirection::Vert, wxSize(slider_width, 256));
-	wxString modes[] = { _("RGB/R"), _("RGB/G"), _("RGB/B"), _("HSL/L"), _("HSV/H") };
-	colorspace_choice = new wxChoice(spectrum_box, -1, wxDefaultPosition, wxDefaultSize, 5, modes);
-
-	wxStaticBoxSizer *rgb_box_sizer = new wxStaticBoxSizer(wxHORIZONTAL, this, _("RGB color"));
-	wxStaticBoxSizer *hsl_box_sizer = new wxStaticBoxSizer(wxVERTICAL, this, _("HSL color"));
-	wxStaticBoxSizer *hsv_box_sizer = new wxStaticBoxSizer(wxVERTICAL, this, _("HSV color"));
-
-	wxWindow *rgb_box = rgb_box_sizer->GetStaticBox();
-	wxWindow *hsl_box = hsl_box_sizer->GetStaticBox();
-	wxWindow *hsv_box = hsv_box_sizer->GetStaticBox();
-
-	for (auto& elem : rgb_input)
-		elem = new wxSpinCtrl(rgb_box, -1, "", wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 0, 255);
-
-	auto dummy = new wxTextCtrl(this, -1);
-	wxSize colorinput_size = dummy->GetSizeFromText("&H000000&");
-	dummy->Destroy();
-
-	ass_input = new wxTextCtrl(rgb_box, -1, "", wxDefaultPosition, colorinput_size);
-	html_input = new wxTextCtrl(rgb_box, -1, "", wxDefaultPosition, colorinput_size);
-	alpha_input = new wxSpinCtrl(rgb_box, -1, "", wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 0, 255);
-	opacity_input = new wxSpinCtrl(rgb_box, -1, "", wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 0, 100);
+	for (auto& input : hsl_input) {
+		input = new wxSpinCtrl(this, -1, "", wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 0, 255);
+		input->Hide();
+	}
+	alpha_input = new wxSpinCtrl(this, -1, "", wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 0, 255);
+	alpha_input->Hide();
+	wxString names[] = {_("Hue (degrees)"), _("Saturation (%)"), _("Brightness (%)")};
+	for (int i = 0; i < 3; ++i) {
+		auto row = new wxBoxSizer(wxHORIZONTAL);
+		row->Add(new wxStaticText(this, -1, names[i]), 1, wxALIGN_CENTER_VERTICAL | wxRIGHT, 4);
+		hsv_input[i] = new wxSpinCtrl(this, -1, "", wxDefaultPosition, wxSize(70, -1), wxSP_ARROW_KEYS, 0, i ? 100 : 360);
+		hsv_input[i]->SetName(wxString::Format("ColourHSV%d", i));
+		row->Add(hsv_input[i]);
+		right->Add(row, 0, wxEXPAND);
+		hsv_sliders[i] = new wxSlider(this, -1, 0, 0, i ? 100 : 360, wxDefaultPosition, wxSize(210, -1));
+		right->Add(hsv_sliders[i], 0, wxEXPAND | wxBOTTOM, 3);
+		hsv_sliders[i]->Bind(wxEVT_SLIDER, [this, i](wxCommandEvent&) {
+			wxEventBlocker block(hsv_input[i]);
+			hsv_input[i]->SetValue(hsv_sliders[i]->GetValue());
+			UpdateFromHSV();
+		});
+	}
+	auto opacity_row = new wxBoxSizer(wxHORIZONTAL);
+	opacity_row->Add(new wxStaticText(this, -1, _("Opacity (%)")), 1, wxALIGN_CENTER_VERTICAL | wxRIGHT, 4);
+	opacity_input = new wxSpinCtrl(this, -1, "", wxDefaultPosition, wxSize(70, -1), wxSP_ARROW_KEYS, 0, 100);
+	opacity_input->SetName("ColourOpacity");
+	opacity_input->Enable(alpha);
 	opacity_input->SetToolTip(_("100% is fully opaque; 0% is fully transparent"));
-	alpha_input->SetToolTip(_("Raw ASS alpha: 0 is opaque; 255 is transparent"));
+	opacity_row->Add(opacity_input);
+	right->Add(opacity_row, 0, wxEXPAND);
+	opacity_slider = new wxSlider(this, -1, 100, 0, 100);
+	opacity_slider->Enable(alpha);
+	right->Add(opacity_slider, 0, wxEXPAND | wxBOTTOM, 5);
+	opacity_slider->Bind(wxEVT_SLIDER, [this](wxCommandEvent&) {
+		wxEventBlocker block(opacity_input);
+		opacity_input->SetValue(opacity_slider->GetValue());
+		UpdateFromOpacity();
+	});
 
-	for (auto& elem : hsl_input)
-		elem = new wxSpinCtrl(hsl_box, -1, "", wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 0, 255);
-
-	for (auto& elem : hsv_input)
-		elem = new wxSpinCtrl(hsv_box, -1, "", wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 0, 255);
-
-	preview_box = new wxStaticBitmap(spectrum_box, -1, wxBitmap(40, 40, 24), wxDefaultPosition, wxSize(40, 40), STATIC_BORDER_FLAG);
-	recent_box = new ColorPickerRecent(this, 8, 4, 16);
+	html_input = new wxTextCtrl(this, -1, "", wxDefaultPosition, wxSize(120, -1));
+	ass_input = new wxTextCtrl(this, -1, "", wxDefaultPosition, wxSize(120, -1));
+	html_input->SetName("ColourRGBHex");
+	ass_input->SetName("ColourASSHex");
+	wxString hex_names[] = {_("RGB Hex"), _("ASS BGR Hex")};
+	wxTextCtrl *hex_controls[] = {html_input, ass_input};
+	right->Add(MakeColorInputSizer(this, hex_names, hex_controls), 0, wxEXPAND | wxBOTTOM, 7);
+	auto rgb_row = new wxBoxSizer(wxHORIZONTAL);
+	for (int i = 0; i < 3; ++i) {
+		auto channel = new wxBoxSizer(wxVERTICAL);
+		channel->Add(new wxStaticText(this, -1, wxString("RGB").Mid(i, 1)), 0, wxBOTTOM, 2);
+		rgb_input[i] = new wxSpinCtrl(this, -1, "", wxDefaultPosition, wxSize(66, -1), wxSP_ARROW_KEYS, 0, 255);
+		rgb_input[i]->SetName(wxString::Format("ColourRGB%d", i));
+		channel->Add(rgb_input[i]);
+		rgb_row->Add(channel, 1, i == 2 ? 0 : wxRIGHT, 3);
+	}
+	right->Add(rgb_row, 0, wxEXPAND | wxBOTTOM, 7);
 
 	eyedropper_bitmap = GETBUNDLE(eyedropper_tool, 24);
+	auto eyedropper = new wxBoxSizer(wxHORIZONTAL);
 	if (enable_os_eyedropper) {
-		os_screen_dropper_button = new wxBitmapButton(this, wxID_ANY, eyedropper_bitmap, wxDefaultPosition, wxDefaultSize, wxBORDER_DEFAULT);
+		os_screen_dropper_button = new wxBitmapButton(this, -1, eyedropper_bitmap);
+		os_screen_dropper_button->SetToolTip(_("Eyedropper"));
+		eyedropper->Add(os_screen_dropper_button, 0, wxALIGN_CENTER_VERTICAL);
 	}
 	if (enable_screenshot_eyedropper) {
-		screenshot_screen_dropper_icon = new wxStaticBitmap(this, -1, eyedropper_bitmap, wxDefaultPosition, wxDefaultSize, (theme::IsDark() ? wxBORDER_SIMPLE : wxRAISED_BORDER));
-		screenshot_screen_dropper = new ColorPickerScreenDropper(this, 7, 7, 8);
+		screenshot_screen_dropper_icon = new wxStaticBitmap(this, -1, eyedropper_bitmap);
+		screenshot_screen_dropper_icon->SetToolTip(_("Click or drag to pick a color from the screen"));
+		screenshot_screen_dropper_icon->SetName("ColourEyedropper");
+		screenshot_screen_dropper = new ColorPickerScreenDropper(this, 7, 7, 6);
+		eyedropper->Add(screenshot_screen_dropper_icon, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, 5);
+		eyedropper->Add(screenshot_screen_dropper, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, 5);
 	}
+	eyedropper->Add(new wxStaticText(this, -1, _("Eyedropper")), 0, wxALIGN_CENTER_VERTICAL);
+	right->Add(eyedropper);
 
-	// Arrange the controls in a nice way
-	wxSizer *spectop_sizer = new wxBoxSizer(wxHORIZONTAL);
-	spectop_sizer->Add(new wxStaticText(spectrum_box, -1, _("Spectrum mode:")), 0, wxALIGN_CENTER_VERTICAL|wxALIGN_LEFT|wxRIGHT, 5);
-	spectop_sizer->Add(colorspace_choice, 0, wxALIGN_CENTER_VERTICAL|wxALIGN_LEFT);
-	spectop_sizer->Add(5, 5, 1, wxEXPAND);
-	spectop_sizer->Add(preview_box, 0, wxALIGN_CENTER_VERTICAL);
-
-	wxSizer *spectrum_sizer = new wxFlexGridSizer(3, 5, 5);
-	spectrum_sizer->Add(spectop_sizer, wxEXPAND);
-	spectrum_sizer->AddStretchSpacer(1);
-	spectrum_sizer->AddStretchSpacer(1);
-	spectrum_sizer->Add(spectrum);
-	spectrum_sizer->Add(slider);
-	spectrum_sizer->Add(alpha_slider);
-	if (!alpha)
-		spectrum_sizer->Hide(alpha_slider);
-
-	spectrum_box_sizer->Add(spectrum_sizer, 0, wxALL, 3);
-
-	wxString rgb_labels[] = { _("Red:"), _("Green:"), _("Blue:") };
-	rgb_box_sizer->Add(MakeColorInputSizer(rgb_box, rgb_labels, rgb_input), 1, wxALL|wxEXPAND, 3);
-
-	wxString ass_labels[] = { "ASS (BGR):", "RGB:", _("Opacity (%):"), _("ASS Alpha:") };
-	wxControl *ass_ctrls[] = { ass_input, html_input, opacity_input, alpha_input };
-	auto ass_colors_sizer = MakeColorInputSizer(rgb_box, ass_labels, ass_ctrls);
-	if (!alpha) {
-		ass_colors_sizer->Hide(opacity_input);
-		ass_colors_sizer->Hide(alpha_input);
-	}
-	rgb_box_sizer->Add(ass_colors_sizer, 0, wxALL|wxCENTER|wxEXPAND, 3);
-
-	wxString hsl_labels[] = { _("Hue:"), _("Sat.:"), _("Lum.:") };
-	hsl_box_sizer->Add(MakeColorInputSizer(hsl_box, hsl_labels, hsl_input), 0, wxALL|wxEXPAND, 3);
-
-	wxString hsv_labels[] = { _("Hue:"), _("Sat.:"), _("Value:") };
-	hsv_box_sizer->Add(MakeColorInputSizer(hsv_box, hsv_labels, hsv_input), 0, wxALL|wxEXPAND, 3);
-
-	wxSizer *hsx_sizer = new wxBoxSizer(wxHORIZONTAL);
-	hsx_sizer->Add(hsl_box_sizer);
-	hsx_sizer->AddSpacer(5);
-	hsx_sizer->Add(hsv_box_sizer);
-
-	wxSizer *picker_sizer = new wxBoxSizer(wxHORIZONTAL);
-	picker_sizer->AddStretchSpacer();
-	if (os_screen_dropper_button) {
-		picker_sizer->Add(os_screen_dropper_button, 0, wxALIGN_CENTER);
-		picker_sizer->AddStretchSpacer();
-	}
-	if (screenshot_screen_dropper) {
-		picker_sizer->Add(screenshot_screen_dropper_icon, 0, wxALIGN_CENTER|wxRIGHT, 5);
-		picker_sizer->Add(screenshot_screen_dropper, 0, wxALIGN_CENTER);
-		picker_sizer->AddStretchSpacer();
-	}
-	picker_sizer->Add(recent_box, 0, wxALIGN_CENTER);
-	picker_sizer->AddStretchSpacer();
-
-	wxSizer *context_sizer = nullptr;
+	left->Add(new wxStaticText(this, -1, _("Recent colors")), 0, wxTOP, 5);
+	recent_box = new ColorPickerRecent(this, 16, 2, 16);
+	left->Add(recent_box, 0, wxTOP, 2);
 	if (context) {
-		auto project_colours = collect_project_colours(*context);
-		wxImage raw_frame_image;
+		auto colors = collect_project_colours(*context);
+		if (!colors.empty()) {
+			left->Add(new wxStaticText(this, -1, _("Project colors")), 0, wxTOP, 5);
+			project_box = new ColorPickerRecent(this, 16, 2, 16);
+			project_box->Load(colors);
+			left->Add(project_box, 0, wxTOP, 2);
+		}
 		if (context->project && context->videoController && context->project->VideoProvider()) {
 			try {
 				auto frame = context->videoController->GetFrame(context->videoController->GetFrameN(), true);
-				if (frame) raw_frame_image = GetImage(*frame);
+				if (frame) {
+					auto pick_video = new wxButton(this, -1, _("Pick from current video frame"));
+					left->Add(pick_video, 0, wxEXPAND | wxTOP, 5);
+					video_frame_picker = new ColorPickerVideoFrame(this, GetImage(*frame));
+					left->Add(video_frame_picker, 0, wxALIGN_CENTER | wxTOP, 5);
+					left->Hide(video_frame_picker);
+					pick_video->Bind(wxEVT_BUTTON, [this, left](wxCommandEvent&) {
+						left->Show(video_frame_picker, !video_frame_picker->IsShown());
+						GetSizer()->Fit(this);
+						Layout();
+					});
+				}
 			}
-			catch (...) {
-				// A temporarily unavailable video frame should not block colour editing.
-			}
-		}
-
-		if (!project_colours.empty() || raw_frame_image.IsOk()) {
-			auto context_box = new wxStaticBoxSizer(wxVERTICAL, this, _("Project and current video frame"));
-			context_sizer = context_box;
-
-			if (!project_colours.empty()) {
-				context_box->Add(new wxStaticText(context_box->GetStaticBox(), -1, _("Frequently used project colors:")),
-					0, wxLEFT | wxRIGHT | wxTOP, 5);
-				project_box = new ColorPickerRecent(context_box->GetStaticBox(), 8, 4, 16);
-				project_box->Load(project_colours);
-				context_box->Add(project_box, 0, wxALIGN_CENTER | wxALL, 5);
-			}
-
-			if (raw_frame_image.IsOk()) {
-				context_box->Add(new wxStaticText(context_box->GetStaticBox(), -1,
-					_("Pick from the current raw video frame:")), 0, wxLEFT | wxRIGHT | wxTOP, 5);
-				video_frame_picker = new ColorPickerVideoFrame(context_box->GetStaticBox(), std::move(raw_frame_image));
-				context_box->Add(video_frame_picker, 0, wxALIGN_CENTER | wxALL, 5);
-			}
+			catch (...) { }
 		}
 	}
-
-	wxStdDialogButtonSizer *button_sizer = CreateStdDialogButtonSizer(wxOK | wxCANCEL | wxHELP);
-
-	wxSizer *input_sizer = new wxBoxSizer(wxVERTICAL);
-	input_sizer->Add(rgb_box_sizer, 0, wxEXPAND);
-	input_sizer->AddSpacer(5);
-	input_sizer->Add(hsx_sizer, 0, wxEXPAND);
-	input_sizer->AddStretchSpacer(1);
-	input_sizer->Add(picker_sizer, 0, wxEXPAND);
-	if (context_sizer) {
-		input_sizer->AddSpacer(5);
-		input_sizer->Add(context_sizer, 0, wxEXPAND);
-	}
-	input_sizer->AddStretchSpacer(2);
-	input_sizer->Add(button_sizer, 0, wxALIGN_RIGHT);
-
-	wxSizer *main_sizer = new wxBoxSizer(wxHORIZONTAL);
-	main_sizer->Add(spectrum_box_sizer, 1, wxALL | wxEXPAND, 5);
-	main_sizer->Add(input_sizer, 0, (wxALL&~wxLEFT)|wxEXPAND, 5);
-
-	SetSizerAndFit(main_sizer);
-
-	persist = std::make_unique<PersistLocation>(this, "Tool/Colour Picker");
-
-	// Fill the controls
-	int mode = OPT_GET("Tool/Colour Picker/Mode")->GetInt();
-	if (mode < 0 || mode > 4) mode = 3; // HSL default
-	colorspace_choice->SetSelection(mode);
+	main->Add(left, 0, wxALL, 8);
+	main->Add(right, 0, wxALL, 8);
+	SetSizerAndFit(main);
 	SetColor(initial_color);
 	recent_box->Load(OPT_GET("Tool/Colour Picker/Recent Colours")->GetListColor());
+	initialized = true;
 
 	using std::bind;
 	for (int i = 0; i < 3; ++i) {
 		rgb_input[i]->Bind(wxEVT_SPINCTRL, bind(&DialogColorPicker::UpdateFromRGB, this, true));
 		rgb_input[i]->Bind(wxEVT_TEXT, bind(&DialogColorPicker::UpdateFromRGB, this, true));
-		hsl_input[i]->Bind(wxEVT_SPINCTRL, bind(&DialogColorPicker::UpdateFromHSL, this, true));
-		hsl_input[i]->Bind(wxEVT_TEXT, bind(&DialogColorPicker::UpdateFromHSL, this, true));
 		hsv_input[i]->Bind(wxEVT_SPINCTRL, bind(&DialogColorPicker::UpdateFromHSV, this, true));
 		hsv_input[i]->Bind(wxEVT_TEXT, bind(&DialogColorPicker::UpdateFromHSV, this, true));
 	}
 	ass_input->Bind(wxEVT_TEXT, bind(&DialogColorPicker::UpdateFromAss, this));
 	html_input->Bind(wxEVT_TEXT, bind(&DialogColorPicker::UpdateFromHTML, this));
-	alpha_input->Bind(wxEVT_SPINCTRL, bind(&DialogColorPicker::UpdateFromAlpha, this));
-	alpha_input->Bind(wxEVT_TEXT, bind(&DialogColorPicker::UpdateFromAlpha, this));
 	opacity_input->Bind(wxEVT_SPINCTRL, bind(&DialogColorPicker::UpdateFromOpacity, this));
 	opacity_input->Bind(wxEVT_TEXT, bind(&DialogColorPicker::UpdateFromOpacity, this));
-
 	if (screenshot_screen_dropper) {
 		screenshot_screen_dropper_icon->Bind(wxEVT_MOTION, &DialogColorPicker::OnDropperMouse, this);
 		screenshot_screen_dropper_icon->Bind(wxEVT_LEFT_DOWN, &DialogColorPicker::OnDropperMouse, this);
@@ -829,25 +804,18 @@ DialogColorPicker::DialogColorPicker(wxWindow *parent, agi::Color initial_color,
 		Bind(wxEVT_LEFT_DOWN, &DialogColorPicker::OnMouse, this);
 		Bind(wxEVT_LEFT_UP, &DialogColorPicker::OnMouse, this);
 	}
-
-	if (os_screen_dropper_button)
-		os_screen_dropper_button->Bind(wxEVT_BUTTON, &DialogColorPicker::OnOsDropperClick, this);
-
+	if (os_screen_dropper_button) os_screen_dropper_button->Bind(wxEVT_BUTTON, &DialogColorPicker::OnOsDropperClick, this);
 	spectrum->Bind(EVT_SPECTRUM_CHANGE, &DialogColorPicker::OnSpectrumChange, this);
 	slider->Bind(EVT_SPECTRUM_CHANGE, &DialogColorPicker::OnSliderChange, this);
-	alpha_slider->Bind(EVT_SPECTRUM_CHANGE, &DialogColorPicker::OnAlphaSliderChange, this);
 	recent_box->Bind(EVT_RECENT_SELECT, &DialogColorPicker::OnRecentSelect, this);
-	if (project_box)
-		project_box->Bind(EVT_RECENT_SELECT, &DialogColorPicker::OnRecentSelect, this);
-	if (video_frame_picker)
-		video_frame_picker->Bind(EVT_RECENT_SELECT, &DialogColorPicker::OnRecentSelect, this);
-	if (screenshot_screen_dropper)
-		screenshot_screen_dropper->Bind(EVT_DROPPER_SELECT, &DialogColorPicker::OnRecentSelect, this);
+	if (project_box) project_box->Bind(EVT_RECENT_SELECT, &DialogColorPicker::OnRecentSelect, this);
+	if (video_frame_picker) video_frame_picker->Bind(EVT_RECENT_SELECT, &DialogColorPicker::OnRecentSelect, this);
+	if (screenshot_screen_dropper) screenshot_screen_dropper->Bind(EVT_DROPPER_SELECT, &DialogColorPicker::OnRecentSelect, this);
 	Bind(EVT_OS_SELECT, &DialogColorPicker::OnRecentSelect, this);
-
-	colorspace_choice->Bind(wxEVT_CHOICE, &DialogColorPicker::OnChangeMode, this);
-
-	button_sizer->GetHelpButton()->Bind(wxEVT_BUTTON, bind(&HelpButton::OpenPage, "Colour Picker"));
+	Bind(wxEVT_CHAR_HOOK, [this](wxKeyEvent& event) {
+		if (event.GetKeyCode() == WXK_ESCAPE) { Dismiss(); OnDismiss(); }
+		else event.Skip();
+	});
 	theme::Apply(this);
 }
 
@@ -874,6 +842,7 @@ static void change_value(wxSpinCtrl *ctrl, int value) {
 void DialogColorPicker::SetColor(agi::Color new_color) {
 	change_value(alpha_input, new_color.a);
 	change_value(opacity_input, colour_picker::AssAlphaToOpacity(new_color.a));
+	opacity_slider->SetValue(opacity_input->GetValue());
 	alpha_slider->SetXY(0, new_color.a);
 	cur_color.a = new_color.a;
 
@@ -906,9 +875,10 @@ void DialogColorPicker::SetHSL(unsigned char r, unsigned char g, unsigned char b
 void DialogColorPicker::SetHSV(unsigned char r, unsigned char g, unsigned char b) {
 	unsigned char h, s, v;
 	rgb_to_hsv(r, g, b, &h, &s, &v);
-	change_value(hsv_input[0], h);
-	change_value(hsv_input[1], s);
-	change_value(hsv_input[2], v);
+	change_value(hsv_input[0], (int(h) * 360 + 127) / 255);
+	change_value(hsv_input[1], (int(s) * 100 + 127) / 255);
+	change_value(hsv_input[2], (int(v) * 100 + 127) / 255);
+	for (int i = 0; i < 3; ++i) hsv_sliders[i]->SetValue(hsv_input[i]->GetValue());
 }
 
 void DialogColorPicker::UpdateFromRGB(bool dirty) {
@@ -945,9 +915,10 @@ void DialogColorPicker::UpdateFromHSL(bool dirty) {
 
 void DialogColorPicker::UpdateFromHSV(bool dirty) {
 	unsigned char r, g, b, h, s, v;
-	h = hsv_input[0]->GetValue();
-	s = hsv_input[1]->GetValue();
-	v = hsv_input[2]->GetValue();
+	h = (hsv_input[0]->GetValue() * 255 + 180) / 360;
+	s = (hsv_input[1]->GetValue() * 255 + 50) / 100;
+	v = (hsv_input[2]->GetValue() * 255 + 50) / 100;
+	for (int i = 0; i < 3; ++i) hsv_sliders[i]->SetValue(hsv_input[i]->GetValue());
 	hsv_to_rgb(h, s, v, &r, &g, &b);
 	SetRGB(agi::Color(r, g, b));
 	SetHSL(r, g, b);
@@ -986,15 +957,17 @@ void DialogColorPicker::UpdateFromHTML() {
 void DialogColorPicker::UpdateFromAlpha() {
 	cur_color.a = alpha_input->GetValue();
 	change_value(opacity_input, colour_picker::AssAlphaToOpacity(cur_color.a));
+	opacity_slider->SetValue(opacity_input->GetValue());
 	alpha_slider->SetXY(0, cur_color.a);
-	callback(cur_color);
+	NotifyChanged();
 }
 
 void DialogColorPicker::UpdateFromOpacity() {
+	opacity_slider->SetValue(opacity_input->GetValue());
 	cur_color.a = colour_picker::OpacityToAssAlpha(opacity_input->GetValue());
 	change_value(alpha_input, cur_color.a);
 	alpha_slider->SetXY(0, cur_color.a);
-	callback(cur_color);
+	NotifyChanged();
 }
 
 void DialogColorPicker::UpdateSpectrumDisplay() {
@@ -1022,8 +995,8 @@ void DialogColorPicker::UpdateSpectrumDisplay() {
 			break;
 		case 4:
 			slider->SetBackground(&hsv_slider);
-			slider->SetXY(0, hsv_input[0]->GetValue());
-			spectrum->SetXY(hsv_input[1]->GetValue(), hsv_input[2]->GetValue());
+			slider->SetXY(0, (hsv_input[0]->GetValue() * 255 + 180) / 360);
+			spectrum->SetXY((hsv_input[1]->GetValue() * 255 + 50) / 100, (hsv_input[2]->GetValue() * 255 + 50) / 100);
 			break;
 	}
 	spectrum_dirty = false;
@@ -1068,7 +1041,7 @@ void DialogColorPicker::UpdateSpectrumDisplay() {
 	});
 	alpha_slider->SetBackground(&alpha_slider_img, true);
 
-	callback(cur_color);
+	NotifyChanged();
 }
 
 template<typename Func>
@@ -1132,7 +1105,7 @@ wxBitmap *DialogColorPicker::MakeHSSpectrum() {
 }
 
 wxBitmap *DialogColorPicker::MakeSVSpectrum() {
-	int h = hsv_input[0]->GetValue();
+	int h = (hsv_input[0]->GetValue() * 255 + 180) / 360;
 	unsigned char maxr, maxg, maxb;
 	hsv_to_rgb(h, 255, 255, &maxr, &maxg, &maxb);
 
@@ -1168,8 +1141,8 @@ void DialogColorPicker::OnSpectrumChange(wxCommandEvent &) {
 			change_value(hsl_input[0], spectrum->GetY());
 			break;
 		case 4:
-			change_value(hsv_input[1], spectrum->GetX());
-			change_value(hsv_input[2], spectrum->GetY());
+			change_value(hsv_input[1], (spectrum->GetX() * 100 + 127) / 255);
+			change_value(hsv_input[2], (spectrum->GetY() * 100 + 127) / 255);
 			break;
 	}
 
@@ -1199,7 +1172,7 @@ void DialogColorPicker::OnSliderChange(wxCommandEvent &) {
 			UpdateFromHSL(false);
 			break;
 		case 4:
-			change_value(hsv_input[0], slider->GetY());
+			change_value(hsv_input[0], (slider->GetY() * 360 + 127) / 255);
 			UpdateFromHSV(false);
 			break;
 	}
@@ -1209,7 +1182,8 @@ void DialogColorPicker::OnAlphaSliderChange(wxCommandEvent &) {
 	change_value(alpha_input, alpha_slider->GetY());
 	cur_color.a = alpha_slider->GetY();
 	change_value(opacity_input, colour_picker::AssAlphaToOpacity(cur_color.a));
-	callback(cur_color);
+	opacity_slider->SetValue(opacity_input->GetValue());
+	NotifyChanged();
 }
 
 void DialogColorPicker::OnRecentSelect(ValueEvent<agi::Color> &evt) {
@@ -1322,14 +1296,21 @@ void DialogColorPicker::OnOsDropperClick(wxCommandEvent&) {
 
 }
 
-bool GetColorFromUser(wxWindow* parent, agi::Color original, bool alpha,
-	std::function<void (agi::Color)> callback, agi::Context const *context)
+void ShowColourPopup(wxWindow *anchor, agi::Color original,
+	std::function<void(agi::Color)> callback, agi::Context const *context, bool alpha,
+	std::function<void()> onDismiss)
 {
-	DialogColorPicker dialog(parent, original, callback, alpha, context);
-	bool ok = dialog.ShowModal() == wxID_OK;
-	if (!ok)
-		callback(original);
-	else
-		dialog.AddColorToRecent();
-	return ok;
+	static wxWeakRef<DialogColorPicker> active;
+	wxWeakRef<wxWindow> owner(anchor);
+	if (active) active->ClosePopup();
+	if (!owner || owner->IsBeingDeleted()) return;
+	auto popup = new DialogColorPicker(anchor, original,
+		[owner, callback = std::move(callback)](agi::Color color) {
+			if (owner && !owner->IsBeingDeleted() && callback) callback(color);
+		}, alpha, context, [owner, onDismiss = std::move(onDismiss)] {
+			if (owner && !owner->IsBeingDeleted() && onDismiss) onDismiss();
+		});
+	active = popup;
+	popup->Position(anchor->ClientToScreen(wxPoint(0, 0)), anchor->GetSize());
+	popup->Popup();
 }

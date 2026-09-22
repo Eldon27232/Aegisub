@@ -69,6 +69,8 @@
 #include <wx/clipbrd.h>
 #include <wx/fontdlg.h>
 #include <wx/textentry.h>
+#include <wx/utils.h>
+#include <wx/window.h>
 
 namespace {
 	using namespace boost::adaptors;
@@ -337,7 +339,6 @@ void show_color_picker(const agi::Context *c, agi::Color (AssStyle::*field), con
 	agi::Color initial_color;
 	const auto active_line = c->selectionController->GetActiveLine();
 	const int sel_start = c->textSelectionController->GetSelectionStart();
-	const int sel_end = c->textSelectionController->GetSelectionStart();
 	const int norm_sel_start = normalize_pos(active_line->Text, sel_start);
 
 	auto const& sel = c->selectionController->GetSelectedSet();
@@ -360,29 +361,26 @@ void show_color_picker(const agi::Context *c, agi::Color (AssStyle::*field), con
 		lines.emplace_back(color, std::move(parsed));
 	}
 
-	int active_shift = 0;
-	int commit_id = -1;
-	bool ok = GetColorFromUser(c->parent, initial_color, true, [&](agi::Color new_color) {
-		for (auto& line : lines) {
+	auto state = std::make_shared<std::vector<line_info>>(std::move(lines));
+	wxWindow *anchor = wxFindWindowAtPoint(wxGetMousePosition());
+	if (!anchor || wxGetTopLevelParent(anchor) != wxGetTopLevelParent(c->parent)) anchor = c->parent;
+	ShowColourPopup(anchor, initial_color,
+		[c, state, sel, active_line, tag, alpha, norm_sel_start, sel_start, commit_id = -1](agi::Color new_color) mutable {
+		// The panel is non-modal: changing the selection ends this editing target.
+		if (c->selectionController->GetActiveLine() != active_line || c->selectionController->GetSelectedSet() != sel) return;
+		int active_shift = 0;
+		for (auto& line : *state) {
 			int shift = line.second.set_tag(tag, new_color.GetAssOverrideFormatted(), norm_sel_start, sel_start);
 			if (new_color.a != line.first.a) {
 				shift += line.second.set_tag(alpha, agi::format("&H%02X&", (int)new_color.a), norm_sel_start, sel_start + shift);
 				line.first.a = new_color.a;
 			}
-
-			if (line.second.line == active_line)
-				active_shift = shift;
+			if (line.second.line == active_line) active_shift = shift;
 		}
-
 		commit_id = c->ass->Commit(_("set color"), AssFile::COMMIT_DIAG_TEXT, commit_id, sel.size() == 1 ? *sel.begin() : nullptr);
-		if (active_shift)
-			c->textSelectionController->SetSelection(sel_start + active_shift, sel_start + active_shift);
+		if (active_shift) c->textSelectionController->SetSelection(sel_start + active_shift, sel_start + active_shift);
 	}, c);
 
-	if (!ok && commit_id != -1) {
-		c->subsController->Undo();
-		c->textSelectionController->SetSelection(sel_start, sel_end);
-	}
 }
 
 struct edit_color_primary final : public Command {
