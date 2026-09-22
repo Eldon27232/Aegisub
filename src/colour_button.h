@@ -20,6 +20,8 @@
 
 #include "value_event.h"
 
+namespace agi { struct Context; }
+
 /// Emitted by ColourButton when the user picks a new color, with the chosen
 /// color set to the event payload
 AGI_DECLARE_EVENT(EVT_COLOR, agi::Color);
@@ -39,7 +41,9 @@ public:
 	/// @param size Size of the bitmap (note: not the size of the button)
 	/// @param alpha Let the user adjust the color's alpha
 	/// @param color Initial color to display
-	ColourButton(wxWindow *parent, wxSize const& size, bool alpha, agi::Color color = agi::Color(), wxValidator const& validator = wxDefaultValidator);
+	ColourButton(wxWindow *parent, wxSize const& size, bool alpha,
+		agi::Color color = agi::Color(), wxValidator const& validator = wxDefaultValidator,
+		agi::Context const *context = nullptr);
 
 	/// Get the currently selected color
 	agi::Color GetColor() { return colour; }

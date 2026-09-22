@@ -28,14 +28,22 @@
 // Aegisub Project http://www.aegisub.org/
 
 #include "colorspace.h"
+#include "ass_dialogue.h"
+#include "ass_file.h"
+#include "ass_style.h"
+#include "colour_picker_model.h"
 #include "compat.h"
 #include "help_button.h"
+#include "include/aegisub/context.h"
 #include "libresrc/libresrc.h"
 #include "options.h"
-#include "theme.h"
 #include "persist_location.h"
+#include "project.h"
+#include "theme.h"
 #include "utils.h"
 #include "value_event.h"
+#include "video_controller.h"
+#include "video_frame.h"
 #include "xdg_desktop_portal_utils.h"
 
 #include <libaegisub/log.h>
@@ -44,6 +52,7 @@
 #include <algorithm>
 #include <cmath>
 #include <memory>
+#include <utility>
 #include <vector>
 
 #include <wx/bitmap.h>
@@ -335,6 +344,86 @@ public:
 	}
 };
 
+/// A clickable, aspect-fitted preview of the current raw video frame.
+class ColorPickerVideoFrame final : public wxControl {
+	wxImage image;
+	wxBitmap preview;
+	colour_picker::ImagePlacement placement;
+
+	void OnClick(wxMouseEvent &evt) {
+		auto point = colour_picker::MapPreviewPoint(
+			GetClientSize().x, GetClientSize().y,
+			image.GetWidth(), image.GetHeight(), evt.GetX(), evt.GetY());
+		if (!point) return;
+
+		auto [x, y] = *point;
+		AddPendingEvent(ValueEvent<agi::Color>(EVT_RECENT_SELECT, GetId(),
+			agi::Color(image.GetRed(x, y), image.GetGreen(x, y), image.GetBlue(x, y))));
+	}
+
+	void OnPaint(wxPaintEvent &) {
+		wxAutoBufferedPaintDC dc(this);
+		dc.SetBackground(*wxBLACK_BRUSH);
+		dc.Clear();
+		if (preview.IsOk()) dc.DrawBitmap(preview, placement.x, placement.y);
+	}
+
+	bool AcceptsFocusFromKeyboard() const override { return false; }
+
+public:
+	ColorPickerVideoFrame(wxWindow *parent, wxImage frame)
+	: wxControl(parent, -1, wxDefaultPosition, wxDefaultSize, STATIC_BORDER_FLAG)
+	, image(std::move(frame))
+	{
+		SetClientSize(240, 135);
+		SetMinSize(GetSize());
+		SetMaxSize(GetSize());
+		SetCursor(*wxCROSS_CURSOR);
+		SetBackgroundStyle(wxBG_STYLE_PAINT);
+
+		auto client_size = GetClientSize();
+		placement = colour_picker::FitImage(client_size.x, client_size.y, image.GetWidth(), image.GetHeight());
+		if (placement.width && placement.height)
+			preview = wxBitmap(image.Scale(placement.width, placement.height, wxIMAGE_QUALITY_HIGH));
+
+		Bind(wxEVT_LEFT_DOWN, &ColorPickerVideoFrame::OnClick, this);
+		Bind(wxEVT_PAINT, &ColorPickerVideoFrame::OnPaint, this);
+	}
+};
+
+void collect_override_colour(std::string const&, AssOverrideParameter *parameter, void *data) {
+	if (parameter->classification != AssParameterClass::COLOR || parameter->omitted) return;
+	try {
+		static_cast<std::vector<agi::Color> *>(data)->push_back(parameter->Get<agi::Color>());
+	}
+	catch (...) {
+		// Malformed/unknown ASS remains untouched and simply does not become a swatch.
+	}
+}
+
+std::vector<agi::Color> collect_project_colours(agi::Context const& context) {
+	std::vector<agi::Color> occurrences;
+	if (!context.ass) return occurrences;
+
+	for (auto const& style : context.ass->Styles) {
+		occurrences.push_back(style.primary);
+		occurrences.push_back(style.secondary);
+		occurrences.push_back(style.outline);
+		occurrences.push_back(style.shadow);
+	}
+
+	for (auto const& line : context.ass->Events) {
+		auto blocks = line.ParseTags();
+		for (auto const& block : blocks) {
+			if (block->GetType() == AssBlockType::OVERRIDE)
+				static_cast<AssDialogueBlockOverride *>(block.get())->ProcessParameters(
+					collect_override_colour, &occurrences);
+		}
+	}
+
+	return colour_picker::RankColours(occurrences, 32);
+}
+
 wxDEFINE_EVENT(EVT_DROPPER_SELECT, ValueEvent<agi::Color>);
 
 class ColorPickerScreenDropper final : public wxControl {
@@ -434,6 +523,7 @@ class DialogColorPicker final : public wxDialog {
 	wxTextCtrl *ass_input;
 	wxTextCtrl *html_input;
 	wxSpinCtrl *alpha_input;
+	wxSpinCtrl *opacity_input;
 
 	/// The eyedropper is set to a blank icon when it's clicked, so store its normal bitmap
 	wxBitmapBundle eyedropper_bitmap;
@@ -446,6 +536,8 @@ class DialogColorPicker final : public wxDialog {
 
 	wxStaticBitmap *preview_box; ///< A box which simply shows the current color
 	ColorPickerRecent *recent_box; ///< A grid of recently used colors
+	ColorPickerRecent *project_box = nullptr; ///< Most-used colours in the current subtitle project
+	ColorPickerVideoFrame *video_frame_picker = nullptr; ///< Raw current-frame eyedropper
 
 	ColorPickerScreenDropper *screenshot_screen_dropper = nullptr;
 	wxStaticBitmap *screenshot_screen_dropper_icon = nullptr;
@@ -463,6 +555,7 @@ class DialogColorPicker final : public wxDialog {
 	/// Update all other controls as a result of modifying the HTML format control
 	void UpdateFromHTML();
 	void UpdateFromAlpha();
+	void UpdateFromOpacity();
 
 	void SetRGB(agi::Color new_color);
 	void SetHSL(unsigned char r, unsigned char g, unsigned char b);
@@ -494,7 +587,8 @@ class DialogColorPicker final : public wxDialog {
 	std::function<void (agi::Color)> callback;
 
 public:
-	DialogColorPicker(wxWindow *parent, agi::Color initial_color, std::function<void (agi::Color)> callback, bool alpha);
+	DialogColorPicker(wxWindow *parent, agi::Color initial_color, std::function<void (agi::Color)> callback,
+		bool alpha, agi::Context const *context);
 	~DialogColorPicker();
 
 	void SetColor(agi::Color new_color);
@@ -524,7 +618,8 @@ static wxBitmap make_slider(Func func) {
 	});
 }
 
-DialogColorPicker::DialogColorPicker(wxWindow *parent, agi::Color initial_color, std::function<void (agi::Color)> callback, bool alpha)
+DialogColorPicker::DialogColorPicker(wxWindow *parent, agi::Color initial_color, std::function<void (agi::Color)> callback,
+	bool alpha, agi::Context const *context)
 : wxDialog(parent, -1, _("Select Color"))
 , callback(std::move(callback))
 {
@@ -566,6 +661,9 @@ DialogColorPicker::DialogColorPicker(wxWindow *parent, agi::Color initial_color,
 	ass_input = new wxTextCtrl(rgb_box, -1, "", wxDefaultPosition, colorinput_size);
 	html_input = new wxTextCtrl(rgb_box, -1, "", wxDefaultPosition, colorinput_size);
 	alpha_input = new wxSpinCtrl(rgb_box, -1, "", wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 0, 255);
+	opacity_input = new wxSpinCtrl(rgb_box, -1, "", wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 0, 100);
+	opacity_input->SetToolTip(_("100% is fully opaque; 0% is fully transparent"));
+	alpha_input->SetToolTip(_("Raw ASS alpha: 0 is opaque; 255 is transparent"));
 
 	for (auto& elem : hsl_input)
 		elem = new wxSpinCtrl(hsl_box, -1, "", wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS, 0, 255);
@@ -607,11 +705,13 @@ DialogColorPicker::DialogColorPicker(wxWindow *parent, agi::Color initial_color,
 	wxString rgb_labels[] = { _("Red:"), _("Green:"), _("Blue:") };
 	rgb_box_sizer->Add(MakeColorInputSizer(rgb_box, rgb_labels, rgb_input), 1, wxALL|wxEXPAND, 3);
 
-	wxString ass_labels[] = { "ASS:", "HTML:", _("Alpha:") };
-	wxControl *ass_ctrls[] = { ass_input, html_input, alpha_input };
+	wxString ass_labels[] = { "ASS (BGR):", "RGB:", _("Opacity (%):"), _("ASS Alpha:") };
+	wxControl *ass_ctrls[] = { ass_input, html_input, opacity_input, alpha_input };
 	auto ass_colors_sizer = MakeColorInputSizer(rgb_box, ass_labels, ass_ctrls);
-	if (!alpha)
+	if (!alpha) {
+		ass_colors_sizer->Hide(opacity_input);
 		ass_colors_sizer->Hide(alpha_input);
+	}
 	rgb_box_sizer->Add(ass_colors_sizer, 0, wxALL|wxCENTER|wxEXPAND, 3);
 
 	wxString hsl_labels[] = { _("Hue:"), _("Sat.:"), _("Lum.:") };
@@ -639,6 +739,41 @@ DialogColorPicker::DialogColorPicker(wxWindow *parent, agi::Color initial_color,
 	picker_sizer->Add(recent_box, 0, wxALIGN_CENTER);
 	picker_sizer->AddStretchSpacer();
 
+	wxSizer *context_sizer = nullptr;
+	if (context) {
+		auto project_colours = collect_project_colours(*context);
+		wxImage raw_frame_image;
+		if (context->project && context->videoController && context->project->VideoProvider()) {
+			try {
+				auto frame = context->videoController->GetFrame(context->videoController->GetFrameN(), true);
+				if (frame) raw_frame_image = GetImage(*frame);
+			}
+			catch (...) {
+				// A temporarily unavailable video frame should not block colour editing.
+			}
+		}
+
+		if (!project_colours.empty() || raw_frame_image.IsOk()) {
+			auto context_box = new wxStaticBoxSizer(wxVERTICAL, this, _("Project and current video frame"));
+			context_sizer = context_box;
+
+			if (!project_colours.empty()) {
+				context_box->Add(new wxStaticText(context_box->GetStaticBox(), -1, _("Frequently used project colors:")),
+					0, wxLEFT | wxRIGHT | wxTOP, 5);
+				project_box = new ColorPickerRecent(context_box->GetStaticBox(), 8, 4, 16);
+				project_box->Load(project_colours);
+				context_box->Add(project_box, 0, wxALIGN_CENTER | wxALL, 5);
+			}
+
+			if (raw_frame_image.IsOk()) {
+				context_box->Add(new wxStaticText(context_box->GetStaticBox(), -1,
+					_("Pick from the current raw video frame:")), 0, wxLEFT | wxRIGHT | wxTOP, 5);
+				video_frame_picker = new ColorPickerVideoFrame(context_box->GetStaticBox(), std::move(raw_frame_image));
+				context_box->Add(video_frame_picker, 0, wxALIGN_CENTER | wxALL, 5);
+			}
+		}
+	}
+
 	wxStdDialogButtonSizer *button_sizer = CreateStdDialogButtonSizer(wxOK | wxCANCEL | wxHELP);
 
 	wxSizer *input_sizer = new wxBoxSizer(wxVERTICAL);
@@ -647,6 +782,10 @@ DialogColorPicker::DialogColorPicker(wxWindow *parent, agi::Color initial_color,
 	input_sizer->Add(hsx_sizer, 0, wxEXPAND);
 	input_sizer->AddStretchSpacer(1);
 	input_sizer->Add(picker_sizer, 0, wxEXPAND);
+	if (context_sizer) {
+		input_sizer->AddSpacer(5);
+		input_sizer->Add(context_sizer, 0, wxEXPAND);
+	}
 	input_sizer->AddStretchSpacer(2);
 	input_sizer->Add(button_sizer, 0, wxALIGN_RIGHT);
 
@@ -678,6 +817,8 @@ DialogColorPicker::DialogColorPicker(wxWindow *parent, agi::Color initial_color,
 	html_input->Bind(wxEVT_TEXT, bind(&DialogColorPicker::UpdateFromHTML, this));
 	alpha_input->Bind(wxEVT_SPINCTRL, bind(&DialogColorPicker::UpdateFromAlpha, this));
 	alpha_input->Bind(wxEVT_TEXT, bind(&DialogColorPicker::UpdateFromAlpha, this));
+	opacity_input->Bind(wxEVT_SPINCTRL, bind(&DialogColorPicker::UpdateFromOpacity, this));
+	opacity_input->Bind(wxEVT_TEXT, bind(&DialogColorPicker::UpdateFromOpacity, this));
 
 	if (screenshot_screen_dropper) {
 		screenshot_screen_dropper_icon->Bind(wxEVT_MOTION, &DialogColorPicker::OnDropperMouse, this);
@@ -696,6 +837,10 @@ DialogColorPicker::DialogColorPicker(wxWindow *parent, agi::Color initial_color,
 	slider->Bind(EVT_SPECTRUM_CHANGE, &DialogColorPicker::OnSliderChange, this);
 	alpha_slider->Bind(EVT_SPECTRUM_CHANGE, &DialogColorPicker::OnAlphaSliderChange, this);
 	recent_box->Bind(EVT_RECENT_SELECT, &DialogColorPicker::OnRecentSelect, this);
+	if (project_box)
+		project_box->Bind(EVT_RECENT_SELECT, &DialogColorPicker::OnRecentSelect, this);
+	if (video_frame_picker)
+		video_frame_picker->Bind(EVT_RECENT_SELECT, &DialogColorPicker::OnRecentSelect, this);
 	if (screenshot_screen_dropper)
 		screenshot_screen_dropper->Bind(EVT_DROPPER_SELECT, &DialogColorPicker::OnRecentSelect, this);
 	Bind(EVT_OS_SELECT, &DialogColorPicker::OnRecentSelect, this);
@@ -728,6 +873,7 @@ static void change_value(wxSpinCtrl *ctrl, int value) {
 
 void DialogColorPicker::SetColor(agi::Color new_color) {
 	change_value(alpha_input, new_color.a);
+	change_value(opacity_input, colour_picker::AssAlphaToOpacity(new_color.a));
 	alpha_slider->SetXY(0, new_color.a);
 	cur_color.a = new_color.a;
 
@@ -814,10 +960,11 @@ void DialogColorPicker::UpdateFromHSV(bool dirty) {
 }
 
 void DialogColorPicker::UpdateFromAss() {
-	agi::Color color(from_wx(ass_input->GetValue()));
-	SetRGB(color);
-	SetHSL(color.r, color.g, color.b);
-	SetHSV(color.r, color.g, color.b);
+	auto color = colour_picker::ParseHex(from_wx(ass_input->GetValue()));
+	if (!color) return;
+	SetRGB(*color);
+	SetHSL(color->r, color->g, color->b);
+	SetHSV(color->r, color->g, color->b);
 	html_input->ChangeValue(to_wx(cur_color.GetHexFormatted()));
 
 	spectrum_dirty = true;
@@ -825,10 +972,11 @@ void DialogColorPicker::UpdateFromAss() {
 }
 
 void DialogColorPicker::UpdateFromHTML() {
-	agi::Color color(from_wx(html_input->GetValue()));
-	SetRGB(color);
-	SetHSL(color.r, color.g, color.b);
-	SetHSV(color.r, color.g, color.b);
+	auto color = colour_picker::ParseHex(from_wx(html_input->GetValue()));
+	if (!color) return;
+	SetRGB(*color);
+	SetHSL(color->r, color->g, color->b);
+	SetHSV(color->r, color->g, color->b);
 	ass_input->ChangeValue(to_wx(cur_color.GetAssOverrideFormatted()));
 
 	spectrum_dirty = true;
@@ -837,6 +985,14 @@ void DialogColorPicker::UpdateFromHTML() {
 
 void DialogColorPicker::UpdateFromAlpha() {
 	cur_color.a = alpha_input->GetValue();
+	change_value(opacity_input, colour_picker::AssAlphaToOpacity(cur_color.a));
+	alpha_slider->SetXY(0, cur_color.a);
+	callback(cur_color);
+}
+
+void DialogColorPicker::UpdateFromOpacity() {
+	cur_color.a = colour_picker::OpacityToAssAlpha(opacity_input->GetValue());
+	change_value(alpha_input, cur_color.a);
 	alpha_slider->SetXY(0, cur_color.a);
 	callback(cur_color);
 }
@@ -1052,6 +1208,7 @@ void DialogColorPicker::OnSliderChange(wxCommandEvent &) {
 void DialogColorPicker::OnAlphaSliderChange(wxCommandEvent &) {
 	change_value(alpha_input, alpha_slider->GetY());
 	cur_color.a = alpha_slider->GetY();
+	change_value(opacity_input, colour_picker::AssAlphaToOpacity(cur_color.a));
 	callback(cur_color);
 }
 
@@ -1165,8 +1322,10 @@ void DialogColorPicker::OnOsDropperClick(wxCommandEvent&) {
 
 }
 
-bool GetColorFromUser(wxWindow* parent, agi::Color original, bool alpha, std::function<void (agi::Color)> callback) {
-	DialogColorPicker dialog(parent, original, callback, alpha);
+bool GetColorFromUser(wxWindow* parent, agi::Color original, bool alpha,
+	std::function<void (agi::Color)> callback, agi::Context const *context)
+{
+	DialogColorPicker dialog(parent, original, callback, alpha, context);
 	bool ok = dialog.ShowModal() == wxID_OK;
 	if (!ok)
 		callback(original);

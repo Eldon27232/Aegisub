@@ -31,12 +31,21 @@
 #include <libaegisub/ass/uuencode.h>
 #include <libaegisub/fs.h>
 
+#include <boost/algorithm/string/predicate.hpp>
+
+#include <optional>
+#include <set>
+#include <utility>
+#include <vector>
+
 DEFINE_EXCEPTION(AssParseError, SubtitleFormatParseError);
 
 void AssSubtitleFormat::ReadFile(AssFile *target, agi::fs::path const& filename, agi::vfr::Framerate const&, const char *encoding) const {
 	int version = !agi::fs::HasExtension(filename, "ssa");
 
-	TextFileReader file(filename, encoding);
+	// Keep the original spelling of lines for passthrough. AssParser parses a
+	// trimmed copy while retaining the untrimmed input in AssFile.
+	TextFileReader file(filename, encoding, false);
 	AssParser parser(target, version);
 	while (file.HasMoreLines())
 		parser.AddLine(file.ReadLineFromFile());
@@ -55,6 +64,28 @@ const char *format(AssEntryGroup group) {
 	if (group == AssEntryGroup::STYLE)
 		return "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding" LINEBREAK;
 	return nullptr;
+}
+
+std::string extradata_signature(ExtradataEntry const& entry) {
+	return std::to_string(entry.id) + "\n" + entry.key + "\n" + entry.value;
+}
+
+std::string encode_extradata(ExtradataEntry const& entry) {
+	std::string line = "Data: ";
+	line += std::to_string(entry.id);
+	line += ",";
+	line += agi::ass::inline_string_encode(entry.key);
+	line += ",";
+	std::string encoded_data = agi::ass::inline_string_encode(entry.value);
+	if (4 * entry.value.size() < 3 * encoded_data.size()) {
+		line += "u";
+		line += agi::ass::UUEncode(entry.value.c_str(), entry.value.c_str() + entry.value.size(), false);
+	}
+	else {
+		line += "e";
+		line += encoded_data;
+	}
+	return line;
 }
 
 struct Writer {
@@ -99,6 +130,8 @@ struct Writer {
 		WriteIfNotEmpty("Video File: ", properties.video_file);
 		WriteIfNotEmpty("Timecodes File: ", properties.timecodes_file);
 		WriteIfNotEmpty("Keyframes File: ", properties.keyframes_file);
+		for (auto const& [key, value] : properties.automation_settings)
+			WriteIfNotEmpty(("Automation Settings " + key + ": ").c_str(), value);
 
 		WriteIfNotZero("Video AR Mode: ", properties.ar_mode);
 		WriteIfNotZero("Video AR Value: ", properties.ar_value);
@@ -129,29 +162,301 @@ struct Writer {
 		group = AssEntryGroup::EXTRADATA;
 		file.WriteLineToFile("");
 		file.WriteLineToFile("[Aegisub Extradata]");
-		for (auto const& edi : extradata) {
-			std::string line = "Data: ";
-			line += std::to_string(edi.id);
-			line += ",";
-			line += agi::ass::inline_string_encode(edi.key);
-			line += ",";
-			std::string encoded_data = agi::ass::inline_string_encode(edi.value);
-			if (4*edi.value.size() < 3*encoded_data.size()) {
-				// the inline_string encoding grew the data by more than uuencoding would
-				// so base64 encode it instead
-				line += "u"; // marker for uuencoding
-				line += agi::ass::UUEncode(edi.value.c_str(), edi.value.c_str() + edi.value.size(), false);
-			} else {
-				line += "e"; // marker for inline_string encoding (escaping)
-				line += encoded_data;
-			}
-			file.WriteLineToFile(line);
+		for (auto const& entry : extradata)
+			file.WriteLineToFile(encode_extradata(entry));
+	}
+};
+
+struct ProjectPropertyState {
+	std::string id;
+	std::string value;
+	bool should_write = false;
+};
+
+std::optional<ProjectPropertyState> get_project_property(ProjectProperties const& properties, std::string const& key) {
+	auto string_property = [&](std::string id, std::string const& value) {
+		return ProjectPropertyState{std::move(id), value, !value.empty()};
+	};
+	auto int_property = [&](std::string id, int value) {
+		return ProjectPropertyState{std::move(id), std::to_string(value), value != 0};
+	};
+	auto double_property = [&](std::string id, double value) {
+		return ProjectPropertyState{std::move(id), std::to_string(value), value != 0.};
+	};
+
+	if (key == "Automation Scripts") return string_property("automation_scripts", properties.automation_scripts);
+	if (key == "Export Filters") return string_property("export_filters", properties.export_filters);
+	if (key == "Export Encoding") return string_property("export_encoding", properties.export_encoding);
+	if (key == "Last Style Storage") return string_property("style_storage", properties.style_storage);
+	if (key == "Audio URI" || key == "Audio File") return string_property("audio_file", properties.audio_file);
+	if (key == "Video File") return string_property("video_file", properties.video_file);
+	if (key == "Timecodes File") return string_property("timecodes_file", properties.timecodes_file);
+	if (key == "Keyframes File") return string_property("keyframes_file", properties.keyframes_file);
+	if (key == "Video Zoom Percent" || key == "Aegisub Video Zoom Percent") return double_property("video_zoom", properties.video_zoom);
+	if (key == "Scroll Position" || key == "Aegisub Scroll Position") return int_property("scroll_position", properties.scroll_position);
+	if (key == "Active Line" || key == "Aegisub Active Line") return int_property("active_row", properties.active_row);
+	if (key == "Video Position" || key == "Aegisub Video Position") return int_property("video_position", properties.video_position);
+	if (key == "Video AR Mode") return int_property("ar_mode", properties.ar_mode);
+	if (key == "Video AR Value") return double_property("ar_value", properties.ar_value);
+
+	constexpr std::string_view automation_prefix = "Automation Settings ";
+	if (key.starts_with(automation_prefix)) {
+		auto setting = key.substr(automation_prefix.size());
+		auto it = properties.automation_settings.find(setting);
+		if (it == properties.automation_settings.end())
+			return ProjectPropertyState{"automation:" + setting, {}, false};
+		return string_property("automation:" + setting, it->second);
+	}
+
+	return std::nullopt;
+}
+
+/// Writer used for files loaded by AssParser. It replays the original layout,
+/// replacing structured placeholders with current model values while leaving
+/// comments, unknown sections, and malformed lines untouched.
+class PassthroughWriter {
+	TextFileWriter file;
+	AssFile const& src;
+	bool exporting;
+	bool wrote_any = false;
+	bool skip_section = false;
+	AssFileSection current_section = AssFileSection::NONE;
+	std::set<AssFileSection> seen_sections;
+	std::set<std::string> emitted_properties;
+
+	std::vector<bool> info_used;
+	std::vector<AssStyle const *> styles;
+	std::vector<AssDialogue const *> events;
+	std::vector<AssAttachment const *> fonts;
+	std::vector<AssAttachment const *> graphics;
+	size_t style_index = 0;
+	size_t event_index = 0;
+	size_t font_index = 0;
+	size_t graphic_index = 0;
+	size_t extradata_index = 0;
+
+	void WriteLine(std::string_view line, bool add_line_break = true) {
+		file.WriteLineToFile(line, add_line_break);
+		wrote_any = true;
+	}
+
+	void WriteSection(std::string_view header, AssEntryGroup group = AssEntryGroup::GROUP_MAX) {
+		if (wrote_any)
+			WriteLine("");
+		WriteLine(header);
+		if (auto line_format = format(group))
+			WriteLine(line_format, false);
+	}
+
+	bool IsSkippedSection(AssFileSection section) const {
+		return exporting && (section == AssFileSection::PROJECT || section == AssFileSection::EXTRADATA);
+	}
+
+	void WriteInfo(AssFilePassthroughLine const& line) {
+		for (size_t i = 0; i < src.Info.size(); ++i) {
+			if (info_used[i] || !boost::iequals(src.Info[i].Key(), line.key))
+				continue;
+
+			info_used[i] = true;
+			auto current = src.Info[i].GetEntryData();
+			WriteLine(current == line.original_value ? line.raw : current);
+			return;
 		}
+	}
+
+	void WriteProjectProperty(AssFilePassthroughLine const& line) {
+		auto property = get_project_property(src.Properties, line.key);
+		if (!property)
+			return;
+
+		emitted_properties.insert(property->id);
+		if (property->value == line.original_value)
+			WriteLine(line.raw);
+		else if (property->should_write)
+			WriteLine(line.key + ": " + property->value);
+	}
+
+	void WriteStyle(AssFilePassthroughLine const& line) {
+		if (style_index >= styles.size()) return;
+		auto current = styles[style_index++]->GetEntryData();
+		WriteLine(current == line.original_value ? line.raw : current);
+	}
+
+	void WriteEvent(AssFilePassthroughLine const& line) {
+		if (event_index >= events.size()) return;
+		auto current = events[event_index++]->GetEntryData();
+		WriteLine(current == line.original_value ? line.raw : current);
+	}
+
+	void WriteAttachment(AssFilePassthroughLine const& line) {
+		auto& list = line.section == AssFileSection::FONTS ? fonts : graphics;
+		auto& index = line.section == AssFileSection::FONTS ? font_index : graphic_index;
+		if (index < list.size())
+			WriteLine(list[index++]->GetEntryData());
+	}
+
+	void WriteExtradata(AssFilePassthroughLine const& line) {
+		if (extradata_index >= src.Extradata.size()) return;
+		auto const& entry = src.Extradata[extradata_index++];
+		WriteLine(extradata_signature(entry) == line.original_value ? line.raw : encode_extradata(entry));
+	}
+
+	void AppendProjectProperty(std::string const& key, bool allow = true) {
+		auto property = get_project_property(src.Properties, key);
+		if (!property || !property->should_write || !allow || emitted_properties.count(property->id))
+			return;
+		emitted_properties.insert(property->id);
+		WriteLine(key + ": " + property->value);
+	}
+
+	void FlushProjectProperties() {
+		AppendProjectProperty("Automation Scripts");
+		AppendProjectProperty("Export Filters");
+		AppendProjectProperty("Export Encoding");
+		AppendProjectProperty("Last Style Storage");
+		AppendProjectProperty("Audio File");
+		AppendProjectProperty("Video File");
+		AppendProjectProperty("Timecodes File");
+		AppendProjectProperty("Keyframes File");
+		for (auto const& setting : src.Properties.automation_settings)
+			AppendProjectProperty("Automation Settings " + setting.first);
+		AppendProjectProperty("Video AR Mode");
+		AppendProjectProperty("Video AR Value");
+
+		bool save_ui_state = config::opt && OPT_GET("App/Save UI State")->GetBool();
+		AppendProjectProperty("Video Zoom Percent", save_ui_state);
+		AppendProjectProperty("Scroll Position", save_ui_state);
+		AppendProjectProperty("Active Line", save_ui_state);
+		AppendProjectProperty("Video Position", save_ui_state);
+	}
+
+	void FlushSection(AssFileSection section) {
+		if (IsSkippedSection(section))
+			return;
+
+		switch (section) {
+			case AssFileSection::SCRIPT_INFO:
+				for (size_t i = 0; i < src.Info.size(); ++i) {
+					if (!info_used[i]) {
+						WriteLine(src.Info[i].GetEntryData());
+						info_used[i] = true;
+					}
+				}
+				break;
+			case AssFileSection::STYLES:
+				while (style_index < styles.size()) WriteLine(styles[style_index++]->GetEntryData());
+				break;
+			case AssFileSection::EVENTS:
+				while (event_index < events.size()) WriteLine(events[event_index++]->GetEntryData());
+				break;
+			case AssFileSection::PROJECT:
+				FlushProjectProperties();
+				break;
+			case AssFileSection::EXTRADATA:
+				while (extradata_index < src.Extradata.size()) WriteLine(encode_extradata(src.Extradata[extradata_index++]));
+				break;
+			case AssFileSection::FONTS:
+				while (font_index < fonts.size()) WriteLine(fonts[font_index++]->GetEntryData());
+				break;
+			case AssFileSection::GRAPHICS:
+				while (graphic_index < graphics.size()) WriteLine(graphics[graphic_index++]->GetEntryData());
+				break;
+			default: break;
+		}
+	}
+
+	void AppendMissingSections() {
+		if (!seen_sections.count(AssFileSection::SCRIPT_INFO) && !src.Info.empty()) {
+			WriteSection("[Script Info]");
+			FlushSection(AssFileSection::SCRIPT_INFO);
+		}
+		if (!seen_sections.count(AssFileSection::PROJECT) && !exporting) {
+			bool has_project_data = !src.Properties.automation_scripts.empty() || !src.Properties.export_filters.empty()
+				|| !src.Properties.export_encoding.empty() || !src.Properties.style_storage.empty()
+				|| !src.Properties.audio_file.empty() || !src.Properties.video_file.empty()
+				|| !src.Properties.timecodes_file.empty() || !src.Properties.keyframes_file.empty()
+				|| !src.Properties.automation_settings.empty() || src.Properties.ar_mode != 0 || src.Properties.ar_value != 0.
+				|| src.Properties.video_zoom != 0. || src.Properties.scroll_position != 0 || src.Properties.active_row != 0
+				|| src.Properties.video_position != 0;
+			if (has_project_data) {
+				WriteSection("[Aegisub Project Garbage]");
+				FlushProjectProperties();
+			}
+		}
+		if (!seen_sections.count(AssFileSection::STYLES) && style_index < styles.size()) {
+			WriteSection("[V4+ Styles]", AssEntryGroup::STYLE);
+			FlushSection(AssFileSection::STYLES);
+		}
+		if (!seen_sections.count(AssFileSection::FONTS) && font_index < fonts.size()) {
+			WriteSection("[Fonts]");
+			FlushSection(AssFileSection::FONTS);
+		}
+		if (!seen_sections.count(AssFileSection::GRAPHICS) && graphic_index < graphics.size()) {
+			WriteSection("[Graphics]");
+			FlushSection(AssFileSection::GRAPHICS);
+		}
+		if (!seen_sections.count(AssFileSection::EVENTS) && event_index < events.size()) {
+			WriteSection("[Events]", AssEntryGroup::DIALOGUE);
+			FlushSection(AssFileSection::EVENTS);
+		}
+		if (!seen_sections.count(AssFileSection::EXTRADATA) && !exporting && extradata_index < src.Extradata.size()) {
+			WriteSection("[Aegisub Extradata]");
+			FlushSection(AssFileSection::EXTRADATA);
+		}
+	}
+
+public:
+	PassthroughWriter(AssFile const& src, agi::fs::path const& filename, std::string const& encoding, bool exporting)
+	: file(filename, encoding)
+	, src(src)
+	, exporting(exporting)
+	, info_used(src.Info.size(), false)
+	{
+		for (auto const& style : src.Styles) styles.push_back(&style);
+		for (auto const& event : src.Events) events.push_back(&event);
+		for (auto const& attachment : src.Attachments) {
+			if (attachment.Group() == AssEntryGroup::FONT) fonts.push_back(&attachment);
+			else if (attachment.Group() == AssEntryGroup::GRAPHIC) graphics.push_back(&attachment);
+		}
+	}
+
+	void Write() {
+		for (auto const& line : src.Passthrough) {
+			if (line.type == AssFilePassthroughType::SECTION) {
+				FlushSection(current_section);
+				current_section = line.section;
+				seen_sections.insert(current_section);
+				skip_section = IsSkippedSection(current_section);
+				if (!skip_section) WriteLine(line.raw);
+				continue;
+			}
+
+			if (skip_section) continue;
+			switch (line.type) {
+				case AssFilePassthroughType::RAW: WriteLine(line.raw); break;
+				case AssFilePassthroughType::SCRIPT_INFO: WriteInfo(line); break;
+				case AssFilePassthroughType::PROJECT_PROPERTY: WriteProjectProperty(line); break;
+				case AssFilePassthroughType::STYLE: WriteStyle(line); break;
+				case AssFilePassthroughType::EVENT: WriteEvent(line); break;
+				case AssFilePassthroughType::ATTACHMENT: WriteAttachment(line); break;
+				case AssFilePassthroughType::EXTRADATA: WriteExtradata(line); break;
+				case AssFilePassthroughType::SECTION: break;
+			}
+		}
+
+		FlushSection(current_section);
+		AppendMissingSections();
 	}
 };
 }
 
 void AssSubtitleFormat::WriteFile(const AssFile *src, agi::fs::path const& filename, agi::vfr::Framerate const&, const char *encoding) const {
+	if (!src->Passthrough.empty()) {
+		PassthroughWriter writer(*src, filename, encoding, false);
+		writer.Write();
+		return;
+	}
+
 	Writer writer(filename, encoding);
 	writer.Write(src->Info);
 	writer.Write(src->Properties);
@@ -162,6 +467,12 @@ void AssSubtitleFormat::WriteFile(const AssFile *src, agi::fs::path const& filen
 }
 
 void AssSubtitleFormat::ExportFile(const AssFile *src, agi::fs::path const& filename, agi::vfr::Framerate const&, const char *encoding) const {
+	if (!src->Passthrough.empty()) {
+		PassthroughWriter writer(*src, filename, encoding, true);
+		writer.Write();
+		return;
+	}
+
 	Writer writer(filename, encoding);
 	writer.Write(src->Info);
 	writer.Write(src->Styles);

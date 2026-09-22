@@ -31,6 +31,8 @@
 #include <boost/algorithm/string/trim.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/regex.hpp>
+#include <cstring>
+#include <exception>
 #include <unordered_map>
 #include <variant>
 
@@ -73,23 +75,44 @@ public:
 		if (it != end(fields)) {
 			using namespace agi::util;
 			struct {
-				using result_type = void;
+				using result_type = bool;
 				ProjectProperties &obj;
 				std::string const& value;
-				void operator()(std::string ProjectProperties::*f) const { obj.*f = value; }
-				void operator()(int ProjectProperties::*f)         const { try_parse(value, &(obj.*f)); }
-				void operator()(double ProjectProperties::*f)      const { try_parse(value, &(obj.*f)); }
+				bool operator()(std::string ProjectProperties::*f) const { obj.*f = value; return true; }
+				bool operator()(int ProjectProperties::*f)         const { return try_parse(value, &(obj.*f)); }
+				bool operator()(double ProjectProperties::*f)      const { return try_parse(value, &(obj.*f)); }
 			} visitor {target->Properties, value};
-			std::visit(visitor, it->second);
-			return true;
+			return std::visit(visitor, it->second);
 		}
 
 		if (key.starts_with("Automation Settings ")) {
-			target->Properties.automation_settings[key.substr(strlen("Automation Settings"))] = value;
+			target->Properties.automation_settings[key.substr(strlen("Automation Settings "))] = value;
 			return true;
 		}
 
 		return false;
+	}
+
+	std::string GetPropertyValue(AssFile const *target, std::string const& key) const {
+		auto it = fields.find(key);
+		if (it != end(fields)) {
+			struct {
+				using result_type = std::string;
+				ProjectProperties const& obj;
+				std::string operator()(std::string ProjectProperties::*f) const { return obj.*f; }
+				std::string operator()(int ProjectProperties::*f) const { return std::to_string(obj.*f); }
+				std::string operator()(double ProjectProperties::*f) const { return std::to_string(obj.*f); }
+			} visitor {target->Properties};
+			return std::visit(visitor, it->second);
+		}
+
+		if (key.starts_with("Automation Settings ")) {
+			auto setting = target->Properties.automation_settings.find(key.substr(strlen("Automation Settings ")));
+			if (setting != target->Properties.automation_settings.end())
+				return setting->second;
+		}
+
+		return {};
 	}
 };
 
@@ -98,12 +121,15 @@ AssParser::AssParser(AssFile *target, int version)
 , target(target)
 , version(version)
 , state(&AssParser::ParseScriptInfoLine)
+, section(AssFileSection::SCRIPT_INFO)
 {
 }
 
 AssParser::~AssParser() = default;
 
-void AssParser::ParseAttachmentLine(std::string const& data) {
+AssParser::ParsedLine AssParser::ParseAttachmentLine(std::string const& rawdata) {
+	std::string data = rawdata;
+	boost::trim(data);
 	bool is_filename = data.starts_with("fontname: ") || data.starts_with("filename: ");
 
 	bool valid_data = data.size() > 0 && data.size() <= 80;
@@ -117,7 +143,7 @@ void AssParser::ParseAttachmentLine(std::string const& data) {
 	// Data is over, add attachment to the file
 	if (!valid_data || is_filename) {
 		target->Attachments.push_back(*attach.release());
-		AddLine(data);
+		AddLine(rawdata);
 	}
 	else {
 		attach->AddData(data);
@@ -126,13 +152,12 @@ void AssParser::ParseAttachmentLine(std::string const& data) {
 		if (data.size() < 80)
 			target->Attachments.push_back(*attach.release());
 	}
+	return ParsedLine::CONSUMED;
 }
 
-void AssParser::ParseScriptInfoLine(std::string const& data) {
+AssParser::ParsedLine AssParser::ParseScriptInfoLine(std::string const& data) {
 	if (data.starts_with(";")) {
-		// Skip stupid comments added by other programs
-		// Of course, we'll add our own in place later... ;)
-		return;
+		return ParsedLine::RAW;
 	}
 
 	if (data.starts_with("ScriptType:")) {
@@ -144,59 +169,102 @@ void AssParser::ParseScriptInfoLine(std::string const& data) {
 		else if (version_str == "v4.00+")
 			version = 1;
 		else
-			throw SubtitleFormatParseError("Unknown SSA file format version");
+			return ParsedLine::RAW;
 	}
 
 	// Nothing actually supports the Collisions property and malformed values
-	// crash VSFilter, so just remove it entirely
+	// crash VSFilter. Keep the original line as passthrough rather than adding
+	// it to the structured Script Info model.
 	if (data.starts_with("Collisions:"))
-		return;
+		return ParsedLine::RAW;
 
 	size_t pos = data.find(':');
-	if (pos == data.npos) return;
+	if (pos == data.npos) return ParsedLine::RAW;
+
+	auto key = data.substr(0, pos);
+	auto value = data.substr(pos + 1);
+	boost::trim_left(value);
+
+	parsed_key = key;
+	if (!property_handler->ProcessProperty(target, key, value)) {
+		target->Info.push_back(*new AssInfo(std::move(key), std::move(value)));
+		parsed_value = target->Info.back().GetEntryData();
+		return ParsedLine::SCRIPT_INFO;
+	}
+
+	parsed_value = property_handler->GetPropertyValue(target, parsed_key);
+	return ParsedLine::PROJECT_PROPERTY;
+}
+
+AssParser::ParsedLine AssParser::ParseMetadataLine(std::string const& rawdata) {
+	std::string data = SanitizeLine(rawdata);
+
+	size_t pos = data.find(':');
+	if (pos == data.npos) return ParsedLine::RAW;
 
 	auto key = data.substr(0, pos);
 	auto value = data.substr(pos + 1);
 	boost::trim_left(value);
 
 	if (!property_handler->ProcessProperty(target, key, value))
-		target->Info.push_back(*new AssInfo(std::move(key), std::move(value)));
+		return ParsedLine::RAW;
+
+	parsed_key = key;
+	parsed_value = property_handler->GetPropertyValue(target, parsed_key);
+	return ParsedLine::PROJECT_PROPERTY;
 }
 
-void AssParser::ParseMetadataLine(std::string const& rawdata) {
-	std::string data = SanitizeLine(rawdata);
+AssParser::ParsedLine AssParser::ParseEventLine(std::string const& data) {
+	if (!data.starts_with("Dialogue:") && !data.starts_with("Comment:"))
+		return ParsedLine::RAW;
 
-	size_t pos = data.find(':');
-	if (pos == data.npos) return;
-
-	auto key = data.substr(0, pos);
-	auto value = data.substr(pos + 1);
-	boost::trim_left(value);
-
-	property_handler->ProcessProperty(target, key, value);
-}
-
-void AssParser::ParseEventLine(std::string const& data) {
-	if (data.starts_with("Dialogue:") || data.starts_with("Comment:"))
+	try {
 		target->Events.push_back(*new AssDialogue(data));
+		parsed_value = target->Events.back().GetEntryData();
+		return ParsedLine::EVENT;
+	}
+	catch (SubtitleFormatParseError const&) {
+		return ParsedLine::RAW;
+	}
+	catch (std::exception const&) {
+		return ParsedLine::RAW;
+	}
 }
 
-void AssParser::ParseStyleLine(std::string const& data) {
-	if (data.starts_with("Style:"))
+AssParser::ParsedLine AssParser::ParseStyleLine(std::string const& data) {
+	if (!data.starts_with("Style:"))
+		return ParsedLine::RAW;
+
+	try {
 		target->Styles.push_back(*new AssStyle(data, version));
+		parsed_value = target->Styles.back().GetEntryData();
+		return ParsedLine::STYLE;
+	}
+	catch (SubtitleFormatParseError const&) {
+		return ParsedLine::RAW;
+	}
+	catch (std::exception const&) {
+		return ParsedLine::RAW;
+	}
 }
 
-void AssParser::ParseFontLine(std::string const& data) {
-	if (data.starts_with("fontname: "))
+AssParser::ParsedLine AssParser::ParseFontLine(std::string const& data) {
+	if (data.starts_with("fontname: ")) {
 		attach = std::make_unique<AssAttachment>(data, AssEntryGroup::FONT);
+		return ParsedLine::ATTACHMENT;
+	}
+	return ParsedLine::RAW;
 }
 
-void AssParser::ParseGraphicsLine(std::string const& data) {
-	if (data.starts_with("filename: "))
+AssParser::ParsedLine AssParser::ParseGraphicsLine(std::string const& data) {
+	if (data.starts_with("filename: ")) {
 		attach = std::make_unique<AssAttachment>(data, AssEntryGroup::GRAPHIC);
+		return ParsedLine::ATTACHMENT;
+	}
+	return ParsedLine::RAW;
 }
 
-void AssParser::ParseExtradataLine(std::string const &rawdata) {
+AssParser::ParsedLine AssParser::ParseExtradataLine(std::string const &rawdata) {
 	std::string data = SanitizeLine(rawdata);
 
 	static const boost::regex matcher("Data:[[:space:]]*(\\d+),([^,]+),(.)(.*)");
@@ -222,7 +290,13 @@ void AssParser::ParseExtradataLine(std::string const &rawdata) {
 		// ensure next_extradata_id is always at least 1 more than the largest existing id
 		target->next_extradata_id = std::max(id+1, target->next_extradata_id);
 		target->Extradata.push_back(ExtradataEntry{id, EXTRADATA_EXPIRATION_LIMIT + 1, std::move(key), std::move(value)});
+		auto const& entry = target->Extradata.back();
+		parsed_key = std::to_string(entry.id);
+		parsed_value = parsed_key + "\n" + entry.key + "\n" + entry.value;
+		return ParsedLine::EXTRADATA;
 	}
+
+	return ParsedLine::RAW;
 }
 
 std::string AssParser::SanitizeLine(std::string const& data) {
@@ -240,36 +314,75 @@ void AssParser::AddLine(std::string const& data) {
 		return;
 	}
 
-	if (data.empty()) return;
+	// TextFileReader does not trim lines for ASS files, so that passthrough can
+	// retain their exact spelling. Parsing still uses the historically trimmed
+	// representation.
+	std::string parsed_data = data;
+	boost::trim(parsed_data);
 
 	// Section header
-	if (data[0] == '[' && data.back() == ']') {
+	if (parsed_data.size() >= 2 && parsed_data[0] == '[' && parsed_data.back() == ']') {
 		// Ugly hacks to allow intermixed v4 and v4+ style sections
-		const std::string low = boost::to_lower_copy(data);
+		const std::string low = boost::to_lower_copy(parsed_data);
 		if (low == "[v4 styles]") {
 			version = 0;
 			state = &AssParser::ParseStyleLine;
+			section = AssFileSection::STYLES;
 		}
 		else if (low == "[v4+ styles]") {
 			version = 1;
 			state = &AssParser::ParseStyleLine;
+			section = AssFileSection::STYLES;
 		}
-		else if (low == "[events]")
+		else if (low == "[events]") {
 			state = &AssParser::ParseEventLine;
-		else if (low == "[script info]")
+			section = AssFileSection::EVENTS;
+		}
+		else if (low == "[script info]") {
 			state = &AssParser::ParseScriptInfoLine;
-		else if (low == "[aegisub project garbage]")
+			section = AssFileSection::SCRIPT_INFO;
+		}
+		else if (low == "[aegisub project garbage]") {
 			state = &AssParser::ParseMetadataLine;
-		else if (low == "[aegisub extradata]")
+			section = AssFileSection::PROJECT;
+		}
+		else if (low == "[aegisub extradata]") {
 			state = &AssParser::ParseExtradataLine;
-		else if (low == "[graphics]")
+			section = AssFileSection::EXTRADATA;
+		}
+		else if (low == "[graphics]") {
 			state = &AssParser::ParseGraphicsLine;
-		else if (low == "[fonts]")
+			section = AssFileSection::GRAPHICS;
+		}
+		else if (low == "[fonts]") {
 			state = &AssParser::ParseFontLine;
-		else
+			section = AssFileSection::FONTS;
+		}
+		else {
 			state = &AssParser::UnknownLine;
+			section = AssFileSection::UNKNOWN;
+		}
+
+		target->Passthrough.push_back({AssFilePassthroughType::SECTION, section, data, {}, {}});
 		return;
 	}
 
-	(this->*state)(data);
+	parsed_key.clear();
+	parsed_value.clear();
+	auto result = (this->*state)(parsed_data);
+	if (result == ParsedLine::CONSUMED)
+		return;
+
+	AssFilePassthroughType type = AssFilePassthroughType::RAW;
+	switch (result) {
+		case ParsedLine::SCRIPT_INFO: type = AssFilePassthroughType::SCRIPT_INFO; break;
+		case ParsedLine::PROJECT_PROPERTY: type = AssFilePassthroughType::PROJECT_PROPERTY; break;
+		case ParsedLine::STYLE: type = AssFilePassthroughType::STYLE; break;
+		case ParsedLine::EVENT: type = AssFilePassthroughType::EVENT; break;
+		case ParsedLine::ATTACHMENT: type = AssFilePassthroughType::ATTACHMENT; break;
+		case ParsedLine::EXTRADATA: type = AssFilePassthroughType::EXTRADATA; break;
+		case ParsedLine::RAW:
+		case ParsedLine::CONSUMED: break;
+	}
+	target->Passthrough.push_back({type, section, data, parsed_key, parsed_value});
 }

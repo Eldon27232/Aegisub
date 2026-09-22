@@ -28,6 +28,7 @@
 // Aegisub Project http://www.aegisub.org/
 
 #include "ass_dialogue.h"
+#include "ass_override_ast.h"
 #include "subtitle_format.h"
 #include "utils.h"
 
@@ -260,6 +261,10 @@ plain:
 	return Blocks;
 }
 
+ass::ast::Document AssDialogue::ParseTextAST() const {
+	return ass::ast::Document::Parse(Text.get());
+}
+
 void AssDialogue::StripTags() {
 	Text = GetStrippedText();
 }
@@ -268,6 +273,10 @@ static std::string get_text(std::unique_ptr<AssDialogueBlock> &d) { return d->Ge
 void AssDialogue::UpdateText(std::vector<std::unique_ptr<AssDialogueBlock>>& blocks) {
 	if (blocks.empty()) return;
 	Text = agi::Join("", blocks | transformed(get_text));
+}
+
+void AssDialogue::UpdateText(ass::ast::Document const& document) {
+	Text = document.Serialize();
 }
 
 bool AssDialogue::CollidesWith(const AssDialogue *target) const {
