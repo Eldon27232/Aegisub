@@ -64,6 +64,10 @@ public:
 	/// Restore source plus persisted ownership. Without metadata, take over
 	/// recognized ASS tags; stale or malformed metadata stays opaque/manual.
 	void SetStoredSource(std::string source, std::string_view origin_metadata);
+	/// Take ownership of the first override block changed by a visual tool,
+	/// while retaining the existing ownership of the unchanged suffix.
+	/// Returns false if the change was not confined to that first block.
+	bool SetGuiFirstOverride(std::string source);
 	std::string Serialize() const;
 	/// Versioned, source-bound ownership runs suitable for Extradata.
 	std::string OriginMetadata() const;
@@ -93,6 +97,7 @@ private:
 		std::string name;
 		bool known = false;
 		bool tag = false;
+		Origin origin = Origin::Gui;
 	};
 	struct Part {
 		PartKind kind = PartKind::Text;
@@ -115,6 +120,7 @@ private:
 
 	static std::vector<Part> ParseParts(std::string_view source);
 	static std::string SerializePart(Part const& part);
+	static void PreserveUnchangedNodeOrigins(std::vector<Node> const& before, std::vector<Node>& after);
 	void RebuildItems();
 };
 

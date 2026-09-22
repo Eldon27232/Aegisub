@@ -70,6 +70,7 @@ class VisualToolDrag final : public VisualTool<VisualToolDragDraggableFeature> {
 	void OnCoordinateSystemsChanged() override { OnFileChanged(); }
 
 	bool InitializeDrag(Feature *feature) override;
+	void OnEmptyClick() override;
 	void UpdateDrag(Feature *feature) override;
 	void Commit(wxString message = wxString()) override;
 	void Draw() override;

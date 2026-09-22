@@ -16,8 +16,10 @@
 
 #include "visual_tool.h"
 
+#include "ass_block_editor_model.h"
 #include "ass_dialogue.h"
 #include "ass_file.h"
+#include "ass_override_ast.h"
 #include "ass_style.h"
 #include "auto4_base.h"
 #include "compat.h"
@@ -268,6 +270,7 @@ void VisualTool<FeatureType>::OnMouseEvent(wxMouseEvent &event) {
 		}
 		// start hold
 		else {
+			OnEmptyClick();
 			if (!alt_down && features.size() > 1) {
 				sel_features.clear();
 				c->selectionController->SetSelectedSet({ c->selectionController->GetActiveLine() });
@@ -664,22 +667,43 @@ void VisualToolBase::SetSelectedOverride(std::string const& tag, std::string con
 		SetOverride(line, tag, value);
 }
 
-void VisualToolBase::RemoveOverride(AssDialogue *line, std::string const& tag) {
-	if (!line) return;
-	auto blocks = line->ParseTags();
-	for (auto ovr : blocks | agi::of_type<AssDialogueBlockOverride>()) {
-		for (size_t i = 0; i < ovr->Tags.size(); i++) {
-			if (tag == ovr->Tags[i].Name) {
-				ovr->Tags.erase(ovr->Tags.begin() + i);
-				i--;
-			}
+static void UpdateVisualBlockOrigin(agi::Context *c, AssDialogue *line, std::string previous_text) {
+	if (line->Text.get() == previous_text) return;
+	std::string metadata;
+	for (auto const& entry : c->ass->GetExtradata(line->ExtradataIds)) {
+		if (entry.key == ass::blocks::kOriginExtradataKey) {
+			metadata = entry.value;
+			break;
 		}
 	}
-	line->UpdateText(blocks);
+	ass::blocks::Model model;
+	model.SetStoredSource(std::move(previous_text), metadata);
+	if (!model.SetGuiFirstOverride(line->Text.get()))
+		model.SetSource(line->Text.get());
+	c->ass->SetExtradataValue(*line, std::string(ass::blocks::kOriginExtradataKey),
+		model.OriginMetadata());
+}
+
+void VisualToolBase::RemoveOverride(AssDialogue *line, std::string const& tag) {
+	if (!line) return;
+	std::string previous_text = line->Text.get();
+	auto document = line->ParseTextAST();
+	for (size_t segment = 0; segment < document.Segments().size(); ++segment) {
+		auto *block = document.MutableSegment(segment)->Block();
+		if (!block) continue;
+		for (size_t i = block->Nodes().size(); i-- > 0;) {
+			if (block->Nodes()[i].Kind() == ass::ast::OverrideNodeKind::Tag
+				&& block->Nodes()[i].Name() == tag)
+				block->EraseNode(i);
+		}
+	}
+	line->UpdateText(document);
+	UpdateVisualBlockOrigin(c, line, std::move(previous_text));
 }
 
 void VisualToolBase::SetOverride(AssDialogue* line, std::string const& tag, std::string const& value) {
 	if (!line) return;
+	std::string previous_text = line->Text.get();
 
 	std::string removeTag;
 	std::string removeTag2;
@@ -694,26 +718,23 @@ void VisualToolBase::SetOverride(AssDialogue* line, std::string const& tag, std:
 	else if (tag == "\\bord") { removeTag = "\\xbord"; removeTag2 = "\\ybord"; }
 	else if (tag == "\\shad") { removeTag = "\\xshad"; removeTag2 = "\\yshad"; }
 
-	// Get block at start
-	auto blocks = line->ParseTags();
-	AssDialogueBlock *block = blocks.front().get();
-
-	if (block->GetType() == AssBlockType::OVERRIDE) {
-		auto ovr = static_cast<AssDialogueBlockOverride*>(block);
-		// Remove old of same
-		for (size_t i = 0; i < ovr->Tags.size(); i++) {
-			std::string const& name = ovr->Tags[i].Name;
-			if (tag == name || removeTag == name || removeTag2 == name) {
-				ovr->Tags.erase(ovr->Tags.begin() + i);
-				i--;
-			}
+	// Only the first override is edited; the lossless AST leaves manual tags
+	// and every later override block byte-for-byte unchanged.
+	auto document = line->ParseTextAST();
+	if (!document.Segments().empty() && document.Segments().front().Kind() == ass::ast::SegmentKind::Override) {
+		auto *block = document.MutableSegment(0)->Block();
+		for (size_t i = block->Nodes().size(); i-- > 0;) {
+			auto const& node = block->Nodes()[i];
+			if (node.Kind() == ass::ast::OverrideNodeKind::Tag &&
+				(tag == node.Name() || removeTag == node.Name() || removeTag2 == node.Name()))
+				block->EraseNode(i);
 		}
-		ovr->AddTag(tag + value);
-
-		line->UpdateText(blocks);
+		block->AppendTag(tag + value);
+		line->UpdateText(document);
 	}
 	else
 		line->Text = agi::Str("{", tag, value, "}", line->Text.get());
+	UpdateVisualBlockOrigin(c, line, std::move(previous_text));
 }
 
 // If only export worked

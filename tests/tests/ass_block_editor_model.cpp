@@ -5,6 +5,7 @@
 // copyright notice and this permission notice appear in all copies.
 
 #include "ass_block_editor_model.h"
+#include "ass_override_ast.h"
 
 #include <gtest/gtest.h>
 
@@ -313,6 +314,128 @@ TEST(ass_block_editor_model, stale_metadata_falls_back_to_manual_instead_of_taki
 	EXPECT_EQ(ItemKind::Text, restored.Items()[0].kind);
 	EXPECT_EQ(Origin::Manual, restored.Items()[0].origin);
 	EXPECT_EQ("{\\pos(9,9)}new", restored.Serialize());
+}
+
+TEST(ass_block_editor_model, visual_tool_changes_keep_gui_tags_and_manual_body) {
+	std::string prefix = "{\\pos(1,2)\\fscx100\\frz0}";
+	std::string body = "手写\\N{\\pos(114,514)}";
+	Model model;
+	model.SetSourceWithManualSpan(prefix + body, prefix.size(), body.size());
+
+	std::string moved = "{\\fscx100\\frz0\\pos(9,8)}" + body;
+	ASSERT_TRUE(model.SetGuiFirstOverride(moved));
+	EXPECT_EQ(moved, model.Serialize());
+	ASSERT_EQ(4u, model.Items().size());
+	EXPECT_EQ("\\pos(9,8)", model.Items()[2].source);
+	EXPECT_EQ(Origin::Gui, model.Items()[2].origin);
+	EXPECT_EQ(body, model.Items()[3].source);
+	EXPECT_EQ(Origin::Manual, model.Items()[3].origin);
+
+	std::string transformed = "{\\pos(9,8)\\frz30\\fscx200}" + body;
+	ASSERT_TRUE(model.SetGuiFirstOverride(transformed));
+	Model reopened;
+	reopened.SetStoredSource(transformed, model.OriginMetadata());
+	EXPECT_EQ(transformed, reopened.Serialize());
+	ASSERT_EQ(4u, reopened.Items().size());
+	for (size_t i = 0; i < 3; ++i) {
+		EXPECT_EQ(ItemKind::Tag, reopened.Items()[i].kind);
+		EXPECT_EQ(Origin::Gui, reopened.Items()[i].origin);
+	}
+	EXPECT_EQ(body, reopened.Items()[3].source);
+	EXPECT_EQ(Origin::Manual, reopened.Items()[3].origin);
+}
+
+TEST(ass_block_editor_model, visual_tool_takes_over_changed_manual_first_tag_only) {
+	std::string body = "手写\\n{\\an8}";
+	Model model;
+	model.SetStoredSource("", {});
+	ASSERT_TRUE(model.ReplaceManual(0, "{\\pos(1,2)}" + body));
+	ASSERT_TRUE(model.SetGuiFirstOverride("{\\pos(3,4)}" + body));
+	ASSERT_EQ(2u, model.Items().size());
+	EXPECT_EQ("\\pos(3,4)", model.Items()[0].source);
+	EXPECT_EQ(Origin::Gui, model.Items()[0].origin);
+	EXPECT_EQ(body, model.Items()[1].source);
+	EXPECT_EQ(Origin::Manual, model.Items()[1].origin);
+
+	Model reopened;
+	reopened.SetStoredSource(model.Serialize(), model.OriginMetadata());
+	ASSERT_EQ(2u, reopened.Items().size());
+	EXPECT_EQ(Origin::Gui, reopened.Items()[0].origin);
+	EXPECT_EQ(body, reopened.Items()[1].source);
+	EXPECT_EQ(Origin::Manual, reopened.Items()[1].origin);
+}
+
+TEST(ass_block_editor_model, visual_tool_preserves_untouched_manual_tags_in_same_and_later_blocks) {
+	std::string original = "{\\pos(1,2)\\an 8}x{\\an 8}y";
+	Model model;
+	model.SetStoredSource("", {});
+	ASSERT_TRUE(model.ReplaceManual(0, original));
+
+	// The native visual tool edits only the first override block using the
+	// lossless ASS AST; later hand-written source is left byte-for-byte intact.
+	auto document = ass::ast::Document::Parse(original);
+	auto *block = document.MutableSegment(0)->Block();
+	ASSERT_NE(nullptr, block);
+	block->EraseNode(0);
+	block->AppendTag("\\pos(3,4)");
+	std::string changed = document.Serialize();
+	EXPECT_EQ("{\\an 8\\pos(3,4)}x{\\an 8}y", changed);
+	ASSERT_TRUE(model.SetGuiFirstOverride(changed));
+	ASSERT_EQ(3u, model.Items().size());
+	EXPECT_EQ(ItemKind::Raw, model.Items()[0].kind);
+	EXPECT_EQ(Origin::Manual, model.Items()[0].origin);
+	EXPECT_EQ("\\an 8", model.Items()[0].source);
+	EXPECT_EQ(ItemKind::Tag, model.Items()[1].kind);
+	EXPECT_EQ(Origin::Gui, model.Items()[1].origin);
+	EXPECT_EQ("\\pos(3,4)", model.Items()[1].source);
+	EXPECT_EQ("x{\\an 8}y", model.Items()[2].source);
+	EXPECT_EQ(Origin::Manual, model.Items()[2].origin);
+
+	Model reopened;
+	reopened.SetStoredSource(changed, model.OriginMetadata());
+	EXPECT_EQ(changed, reopened.Serialize());
+	ASSERT_EQ(3u, reopened.Items().size());
+	EXPECT_EQ(Origin::Manual, reopened.Items()[0].origin);
+	EXPECT_EQ(Origin::Gui, reopened.Items()[1].origin);
+	EXPECT_EQ(Origin::Manual, reopened.Items()[2].origin);
+}
+
+TEST(ass_block_editor_model, visual_tool_inserts_gui_override_before_manual_source) {
+	std::string body = "正文\\N{\\pos(114,514)}";
+	Model model;
+	model.SetStoredSource("", {});
+	ASSERT_TRUE(model.ReplaceManual(0, body));
+	ASSERT_TRUE(model.SetGuiFirstOverride("{\\iclip(0,0,100,100)}" + body));
+	ASSERT_EQ(2u, model.Items().size());
+	EXPECT_EQ(ItemKind::Tag, model.Items()[0].kind);
+	EXPECT_EQ(Origin::Gui, model.Items()[0].origin);
+	EXPECT_EQ(body, model.Items()[1].source);
+	EXPECT_EQ(Origin::Manual, model.Items()[1].origin);
+}
+
+TEST(ass_block_editor_model, visual_tool_override_families_remain_structured) {
+	std::pair<std::string, std::string> cases[] = {
+		{"\\move(0,0,10,10)", "\\move(1,2,11,12)"},
+		{"\\org(0,0)", "\\org(10,20)"},
+		{"\\fscy100", "\\fscy125"},
+		{"\\frx0", "\\frx15"},
+		{"\\fry0", "\\fry20"},
+		{"\\clip(0,0,10,10)", "\\clip(2,2,12,12)"},
+		{"\\iclip(0,0,10,10)", "\\iclip(2,2,12,12)"}
+	};
+	for (auto const& [before, after] : cases) {
+		std::string old_prefix = "{" + before + "}";
+		std::string body = "正文\\N";
+		Model model;
+		model.SetSourceWithManualSpan(old_prefix + body, old_prefix.size(), body.size());
+		ASSERT_TRUE(model.SetGuiFirstOverride("{" + after + "}" + body)) << after;
+		ASSERT_EQ(2u, model.Items().size()) << after;
+		EXPECT_EQ(ItemKind::Tag, model.Items()[0].kind) << after;
+		EXPECT_EQ(Origin::Gui, model.Items()[0].origin) << after;
+		EXPECT_EQ(after, model.Items()[0].source);
+		EXPECT_EQ(Origin::Manual, model.Items()[1].origin);
+		EXPECT_EQ(body, model.Items()[1].source);
+	}
 }
 
 TEST(ass_block_editor_model, direct_source_takeover_persists_known_gui_and_unknown_raw_items) {
