@@ -337,7 +337,10 @@ SubsEditBox::SubsEditBox(wxWindow *parent, agi::Context *context)
 	edit_ctrl->Bind(wxEVT_STC_MODIFIED, &SubsEditBox::OnChange, this);
 	edit_ctrl->SetModEventMask(wxSTC_MOD_INSERTTEXT | wxSTC_MOD_DELETETEXT | wxSTC_STARTACTION);
 	new_block->Bind(wxEVT_BUTTON, &SubsEditBox::OnBlockNew, this);
-	templates->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { ShowAssTemplateManager(this, c); });
+	templates->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
+		if (ShowAssTemplateManager(this, c) == AssTemplateDialogResult::AppliedNew)
+			CallAfter([this] { FocusTextBody(); });
+	});
 	new_text->Bind(wxEVT_BUTTON, &SubsEditBox::OnNewText, this);
 	show_ass_source->Bind(wxEVT_CHECKBOX, &SubsEditBox::OnShowAssSource, this);
 
@@ -479,7 +482,7 @@ void SubsEditBox::UpdateFields(int type, bool repopulate_lists) {
 
 	if (type & AssFile::COMMIT_DIAG_TEXT) {
 		edit_ctrl->SetTextTo(line->Text);
-		block_model->SetSource(line->Text);
+		block_model->SetStoredSource(line->Text, BlockOriginMetadata(line));
 		RefreshBlocks();
 		UpdateCharacterCount(line->Text);
 	}
@@ -661,10 +664,11 @@ void SubsEditBox::RefreshBlocks() {
 		auto *title = new wxStaticText(card, wxID_ANY, to_wx(item.label));
 		title->SetFont(title->GetFont().Bold()); title->Bind(wxEVT_LEFT_DOWN, select);
 		row->Add(title, wxSizerFlags().CenterVertical().Border(wxALL, 8));
-		auto save = [this, i, generation](std::string const& source, bool refresh = false) {
-			if (generation != block_generation || source.empty()) return;
+		bool manual = item.origin == ass::blocks::Origin::Manual;
+		auto save = [this, i, generation, manual](std::string const& source, bool refresh = false) {
+			if (generation != block_generation || (source.empty() && !manual)) return;
 			auto previous = block_model->Items();
-			if (!block_model->Replace(i, source)) return;
+			if (!(manual ? block_model->ReplaceManual(i, source) : block_model->Replace(i, source))) return;
 			ApplyBlockChange(_("Edit ASS block"), false);
 			auto const& current = block_model->Items();
 			bool same_structure = previous.size() == current.size() && std::equal(previous.begin(), previous.end(), current.begin(),
@@ -791,16 +795,18 @@ void SubsEditBox::RefreshBlocks() {
 		else {
 			auto *text = new wxTextCtrl(card, wxID_ANY, to_wx(item.source), wxDefaultPosition, FromDIP(wxSize(340, -1)));
 			text->SetName(item.kind==ass::blocks::ItemKind::Raw?"block-raw-ass":"block-text"); field("",text);
-			if (item.kind == ass::blocks::ItemKind::Text && !body_text_ctrl)
+			if (item.kind == ass::blocks::ItemKind::Text && manual && !body_text_ctrl)
 				body_text_ctrl = text;
 			if (item.kind == ass::blocks::ItemKind::Text)
 				text->Bind(wxEVT_TEXT,[text,save](wxCommandEvent&) {save(from_wx(text->GetValue()));});
 			else text->Bind(wxEVT_KILL_FOCUS,[text,save](wxFocusEvent& event) {event.Skip(); save(from_wx(text->GetValue()), true);});
-			text->Bind(wxEVT_KILL_FOCUS,[this,text,i,generation](wxFocusEvent& event) {
-				event.Skip();
-				if (!text->GetValue().empty()) return;
-				CallAfter([this,i,generation] { if(generation==block_generation && block_model->Delete({i})) ApplyBlockChange(_("Delete ASS block")); });
-			});
+			if (!manual) {
+				text->Bind(wxEVT_KILL_FOCUS,[this,text,i,generation](wxFocusEvent& event) {
+					event.Skip();
+					if (!text->GetValue().empty()) return;
+					CallAfter([this,i,generation] { if(generation==block_generation && block_model->Delete({i})) ApplyBlockChange(_("Delete ASS block")); });
+				});
+			}
 		}
 		card->SetSizer(row);
 		block_list->GetSizer()->Add(card,wxSizerFlags().Expand().Border(wxALL,4));
@@ -817,9 +823,29 @@ void SubsEditBox::ApplyBlockChange(wxString const& desc, bool rebuild) {
 	changing_blocks = true;
 	auto source = block_model->Serialize();
 	edit_ctrl->SetTextTo(source);
-	if (line) { CommitText(desc); UpdateCharacterCount(source); }
+	if (line) {
+		StoreBlockOriginMetadata();
+		CommitText(desc, AssFile::COMMIT_EXTRADATA);
+		UpdateCharacterCount(source);
+	}
 	changing_blocks = false;
 	if (rebuild) RefreshBlocks();
+}
+
+std::string SubsEditBox::BlockOriginMetadata(AssDialogue const *dialogue) const {
+	if (!dialogue) return {};
+	for (auto const& entry : c->ass->GetExtradata(dialogue->ExtradataIds)) {
+		if (entry.key == ass::blocks::kOriginExtradataKey)
+			return entry.value;
+	}
+	return {};
+}
+
+void SubsEditBox::StoreBlockOriginMetadata() {
+	auto metadata = block_model->OriginMetadata();
+	auto key = std::string(ass::blocks::kOriginExtradataKey);
+	for (auto *dialogue : c->selectionController->GetSelectedSet())
+		c->ass->SetExtradataValue(*dialogue, key, metadata);
 }
 
 void SubsEditBox::FocusTextBody() {
@@ -927,9 +953,11 @@ void SubsEditBox::OnChange(wxStyledTextEvent &event) {
 	if (line && edit_ctrl->GetTextRaw().data() != line->Text.get()) {
 		if (event.GetModificationType() & wxSTC_STARTACTION)
 			commit_id = -1;
-		CommitText(_("modify text"));
+		auto source = edit_ctrl->GetTextRaw();
+		block_model->SetSource(std::string(source.data(), source.length()));
+		StoreBlockOriginMetadata();
+		CommitText(_("modify text"), AssFile::COMMIT_EXTRADATA);
 		UpdateCharacterCount(line->Text);
-		block_model->SetSource(line->Text);
 		RefreshBlocks();
 	}
 }
@@ -962,9 +990,10 @@ void SubsEditBox::SetSelectedRows(T AssDialogueBase::*field, wxString const& val
 	SetSelectedRows([&](AssDialogue *d) { d->*field = conv_value; }, desc, type, amend);
 }
 
-void SubsEditBox::CommitText(wxString const& desc) {
+void SubsEditBox::CommitText(wxString const& desc, int extra_type) {
 	auto data = edit_ctrl->GetTextRaw();
-	SetSelectedRows(&AssDialogue::Text, boost::flyweight<std::string>(data.data(), data.length()), desc, AssFile::COMMIT_DIAG_TEXT, true);
+	SetSelectedRows(&AssDialogue::Text, boost::flyweight<std::string>(data.data(), data.length()), desc,
+		AssFile::COMMIT_DIAG_TEXT | extra_type, true);
 }
 
 void SubsEditBox::CommitTimes(TimeField field) {
@@ -1064,7 +1093,7 @@ void SubsEditBox::SetControlsState(bool state) {
 	if (!state) {
 		wxEventBlocker blocker(this);
 		edit_ctrl->SetTextTo("");
-		block_model->SetSource("");
+		block_model->SetStoredSource("", {});
 		RefreshBlocks();
 	}
 }
